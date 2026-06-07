@@ -1,6 +1,10 @@
 # YouTubeLiveHopper
 
 YouTube Liveの配信一覧を表示し、配信終了時に自動で次のチャンネルへ切り替えるChrome拡張機能です。
+
+<img height="500" alt="s_6" src="https://github.com/user-attachments/assets/948a23e4-3a85-4149-abdb-9e9e3a8138da" />
+
+
   
 拡張機能の作者(@huro3h)はゲームのLive配信を流しっぱなしにしながら、同じゲームをすることが多いですが  
 配信終了の度にコントローラーから手を離して、Live中のチャンネルを手動で切り替えるのが面倒と感じたのがモチベーションです  
