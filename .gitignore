@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# RubyMine / JetBrains IDE
+.idea/
+*.iml
+*.crx
+*.pem
+*.zip
+node_modules/
+npm-debug.log
