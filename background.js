@@ -70,6 +70,21 @@ async function startMonitoring(channel, autoHop, jumpToLive, channels, currentIn
 async function hopToNext() {
   clearInterval(state.checkInterval);
 
+  // 遷移前にリストを最新化する
+  const { apiKey, topicChannels, lastQuery } = await chrome.storage.local.get(['apiKey', 'topicChannels', 'lastQuery']);
+  if (apiKey) {
+    const [topicLives, searchResults] = await Promise.all([
+      topicChannels?.length ? fetchTopicLives(topicChannels, apiKey) : Promise.resolve([]),
+      lastQuery ? fetchLiveStreamsSingle(lastQuery, apiKey) : Promise.resolve([])
+    ]);
+    const topicIds = new Set(topicLives.map(v => v.videoId));
+    const merged = [...topicLives, ...searchResults.filter(v => !topicIds.has(v.videoId))];
+    if (merged.length > 0) {
+      state.channels = merged;
+      await chrome.storage.local.set({ channels: merged });
+    }
+  }
+
   const next = state.currentIndex + 1;
   if (next >= state.channels.length) {
     state.active = false;
@@ -111,6 +126,38 @@ async function pollLiveStatus(videoId) {
       if (state.autoHop) hopToNext();
     }
   } catch {}
+}
+
+// キーワード検索（background.jsから呼び出し用）
+async function fetchLiveStreamsSingle(query, apiKey) {
+  const API_BASE = 'https://www.googleapis.com/youtube/v3';
+  try {
+    const searchUrl = `${API_BASE}/search?part=snippet&eventType=live&type=video&q=${encodeURIComponent(query)}&maxResults=20&key=${apiKey}&relevanceLanguage=ja&order=viewCount`;
+    const res = await fetch(searchUrl);
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (!data.items?.length) return [];
+
+    const videoIds = data.items.map(i => i.id.videoId).join(',');
+    const statsRes = await fetch(
+      `${API_BASE}/videos?part=liveStreamingDetails,snippet&id=${videoIds}&key=${apiKey}`
+    );
+    const statsData = await statsRes.json();
+
+    return (statsData.items || [])
+      .filter(item => item.snippet?.liveBroadcastContent === 'live')
+      .map(item => ({
+        videoId: item.id,
+        title: item.snippet.title,
+        channelTitle: item.snippet.channelTitle,
+        channelId: item.snippet.channelId,
+        thumbnail: item.snippet.thumbnails?.default?.url || '',
+        viewerCount: parseInt(item.liveStreamingDetails?.concurrentViewers || '0'),
+        actualStartTime: item.liveStreamingDetails?.actualStartTime || null,
+        url: `https://www.youtube.com/watch?v=${item.id}`,
+        isTopic: false
+      })).sort((a, b) => b.viewerCount - a.viewerCount);
+  } catch { return []; }
 }
 
 // トピックの /live ページHTMLからytInitialDataを取得
@@ -167,6 +214,7 @@ async function fetchTopicLives(topicChannels, apiKey) {
           channelId: item.snippet.channelId,
           thumbnail: item.snippet.thumbnails?.default?.url || '',
           viewerCount: parseInt(item.liveStreamingDetails?.concurrentViewers || '0'),
+          actualStartTime: item.liveStreamingDetails?.actualStartTime || null,
           url: `https://www.youtube.com/watch?v=${item.id}`,
           isTopic: true,
           topicChannelId: topic.channelId

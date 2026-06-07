@@ -17,7 +17,7 @@
       --live: #ff3d6b;
       --text: #f0f0f8;
       --text-muted: #6b6b8a;
-      --text-dim: #9090b0;
+      --text-dim: #b8b8d0;
       --success: #22d3a0;
       --radius: 10px;
     }
@@ -29,7 +29,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      width: 380px;
+      width: 420px;
       height: 640px;
       background: var(--bg);
       color: var(--text);
@@ -305,6 +305,12 @@
     .channel-item.playing .channel-thumb { border-color: var(--live); }
 
     .channel-info { flex: 1; min-width: 0; }
+    .channel-name-row {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+    }
     .channel-name {
       font-weight: 500;
       font-size: 12px;
@@ -312,26 +318,42 @@
       overflow: hidden;
       text-overflow: ellipsis;
       color: var(--text);
+      min-width: 0;
+    }
+    .live-badge {
+      display: flex; align-items: center; gap: 2px;
+      background: var(--live);
+      color: #fff;
+      font-size: 8px;
+      font-weight: 700;
+      padding: 1px 4px;
+      border-radius: 3px;
+      letter-spacing: 0.3px;
+      flex-shrink: 0;
+    }
+    .channel-title {
+      font-size: 10px;
+      color: var(--text-dim);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 1px;
     }
     .channel-meta {
       display: flex;
       align-items: center;
       gap: 6px;
       margin-top: 2px;
-    }
-    .live-badge {
-      display: flex; align-items: center; gap: 3px;
-      background: var(--live);
-      color: #fff;
-      font-size: 9px;
-      font-weight: 700;
-      padding: 1px 5px;
-      border-radius: 3px;
-      letter-spacing: 0.5px;
+      min-width: 0;
     }
     .viewer-count {
       font-size: 10px;
-      color: var(--text-muted);
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+    .channel-elapsed {
+      font-size: 10px;
+      color: var(--text-dim);
     }
 
     .channel-actions {
@@ -341,33 +363,6 @@
       transition: opacity 0.15s;
     }
     .channel-item:hover .channel-actions { opacity: 1; }
-
-    /* Now playing */
-    .now-playing {
-      padding: 12px 20px;
-      background: linear-gradient(135deg, rgba(255,61,107,0.06), rgba(124,58,237,0.06));
-      border-bottom: 1px solid var(--border);
-      display: none;
-    }
-    .now-playing.visible { display: block; }
-    .np-label {
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 5px;
-    }
-    .np-title {
-      font-family: 'Syne', sans-serif;
-      font-weight: 600;
-      font-size: 12px;
-      line-height: 1.4;
-      color: var(--text);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
 
     /* Controls */
     .controls {
@@ -562,12 +557,6 @@
     <button class="btn btn-ghost btn-sm" id="nextBtn" disabled>次へ ⏭</button>
   </div>
   <button class="btn btn-ghost btn-sm" id="refreshBtn">🔄</button>
-</div>
-
-<!-- Now Playing -->
-<div class="now-playing" id="nowPlaying">
-  <div class="np-label">▶ NOW PLAYING</div>
-  <div class="np-title" id="npTitle">—</div>
 </div>
 
 <!-- Loading -->

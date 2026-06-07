@@ -77,13 +77,37 @@
   function seekToLiveHead() {
     const attempt = (tries) => {
       const player = document.getElementById('movie_player');
-      if (player && typeof player.seekToLiveHead === 'function') {
-        player.seekToLiveHead();
-      } else if (tries > 0) {
-        setTimeout(() => attempt(tries - 1), 1000);
+      if (!player) {
+        if (tries > 0) setTimeout(() => attempt(tries - 1), 500);
+        return;
       }
+
+      // 方法①: ライブバッジをクリック（最も確実）
+      const liveBadge = document.querySelector('.ytp-live-badge');
+      if (liveBadge) {
+        liveBadge.click();
+        // 念押しで方法②も実行
+        if (typeof player.seekToLiveHead === 'function') player.seekToLiveHead();
+        return;
+      }
+
+      // 方法②: プレーヤーAPIを使用
+      if (typeof player.seekToLiveHead === 'function') {
+        const playerState = player.getPlayerState?.();
+        if (playerState === 1 || playerState === 2 || playerState === 3) {
+          player.seekToLiveHead();
+          setTimeout(() => {
+            const badge = document.querySelector('.ytp-live-badge');
+            if (badge) badge.click();
+          }, 2000);
+          return;
+        }
+      }
+
+      // どちらもまだ準備できていない場合はリトライ
+      if (tries > 0) setTimeout(() => attempt(tries - 1), 500);
     };
-    setTimeout(() => attempt(10), 2000);
+    setTimeout(() => attempt(20), 1000);
   }
 
   // YouTube SPA のページ遷移を検知

@@ -17,8 +17,6 @@ const searchBtn        = document.getElementById('searchBtn');
 const channelList      = document.getElementById('channelList');
 const loading          = document.getElementById('loading');
 const empty            = document.getElementById('empty');
-const nowPlaying       = document.getElementById('nowPlaying');
-const npTitle          = document.getElementById('npTitle');
 const prevBtn          = document.getElementById('prevBtn');
 const nextBtn          = document.getElementById('nextBtn');
 const refreshBtn       = document.getElementById('refreshBtn');
@@ -63,11 +61,19 @@ async function init() {
     currentIndex = stored.currentIndex ?? -1;
     renderChannels();
     updateControls();
-    updateNowPlaying();
   }
 
   chrome.runtime.sendMessage({ type: 'GET_STATUS' }, (res) => {
-    if (res) updateStatus(res.active, res.channelName);
+    if (!res) return;
+    updateStatus(res.active, res.channelName);
+
+    if (res.channels?.length && res.currentIndex !== currentIndex) {
+      currentIndex = res.currentIndex;
+      channels = res.channels;
+      chrome.storage.local.set({ currentIndex });
+      renderChannels();
+      updateControls();
+    }
   });
 }
 
@@ -199,7 +205,6 @@ async function buildMergedList(query) {
       setEmpty(false);
       renderChannels();
       updateControls();
-      updateNowPlaying();
     } else {
       setEmpty(true);
     }
@@ -261,6 +266,7 @@ async function fetchLiveStreamsSingle(query) {
     channelId: item.snippet.channelId,
     thumbnail: item.snippet.thumbnails?.default?.url || '',
     viewerCount: parseInt(item.liveStreamingDetails?.concurrentViewers || '0'),
+    actualStartTime: item.liveStreamingDetails?.actualStartTime || null,
     url: `https://www.youtube.com/watch?v=${item.id}`,
     isTopic: false
   })).sort((a, b) => b.viewerCount - a.viewerCount);
@@ -380,6 +386,16 @@ function makeAccordionHeader({ label, count, collapsed, onToggle, onRemove, onCl
   return div;
 }
 
+function formatElapsed(actualStartTime) {
+  if (!actualStartTime) return '';
+  const elapsed = Date.now() - new Date(actualStartTime).getTime();
+  const h = Math.floor(elapsed / 3600000);
+  const m = Math.floor((elapsed % 3600000) / 60000);
+  const start = new Date(actualStartTime).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+  const duration = h > 0 ? `${h}時間${m}分経過` : `${m}分経過`;
+  return `${start}〜 / ${duration}`;
+}
+
 function makeChannelItem(ch, idx) {
   const div = document.createElement('div');
   div.className = 'channel-item' + (idx === currentIndex ? ' playing' : '');
@@ -388,13 +404,20 @@ function makeChannelItem(ch, idx) {
     ? (ch.viewerCount >= 1000 ? (ch.viewerCount / 1000).toFixed(1) + 'K' : ch.viewerCount) + ' 視聴中'
     : '';
 
+  const elapsed = formatElapsed(ch.actualStartTime);
+
   div.innerHTML = `
     <img class="channel-thumb" src="${ch.thumbnail}" onerror="this.src=''" />
     <div class="channel-info">
-      <div class="channel-name">${escHtml(ch.channelTitle)}</div>
-      <div class="channel-meta">
+      <div class="channel-name-row">
         <span class="live-badge">● LIVE</span>
+        <span class="channel-name">${escHtml(ch.channelTitle)}</span>
+      </div>
+      <div class="channel-title">${escHtml(ch.title)}</div>
+      <div class="channel-meta">
         ${viewers ? `<span class="viewer-count">${viewers}</span>` : ''}
+        ${viewers && elapsed ? `<span style="color:var(--text-muted);font-size:10px">·</span>` : ''}
+        ${elapsed ? `<span class="channel-elapsed">${elapsed}</span>` : ''}
       </div>
     </div>
     <div class="channel-actions">
@@ -424,7 +447,6 @@ function clearSearch() {
     setEmpty(false);
     renderChannels();
     updateControls();
-    updateNowPlaying();
   } else {
     setEmpty(true);
   }
@@ -439,7 +461,6 @@ async function playChannel(idx) {
 
   renderChannels();
   updateControls();
-  updateNowPlaying();
 
   const youtubeTab = await findYouTubeTab();
   if (youtubeTab) {
@@ -492,7 +513,7 @@ chrome.runtime.onMessage.addListener((msg) => {
     currentIndex = msg.currentIndex;
     channels = msg.channels;
     chrome.storage.local.set({ currentIndex });
-    renderChannels(); updateControls(); updateNowPlaying();
+    renderChannels(); updateControls();
     updateStatus(true, channels[currentIndex]?.channelTitle);
   }
   if (msg.type === 'LIVE_ENDED_NO_NEXT') {
@@ -505,14 +526,6 @@ chrome.runtime.onMessage.addListener((msg) => {
 function updateControls() {
   prevBtn.disabled = currentIndex <= 0 || channels.length === 0;
   nextBtn.disabled = channels.length === 0;
-}
-function updateNowPlaying() {
-  if (currentIndex >= 0 && channels[currentIndex]) {
-    nowPlaying.classList.add('visible');
-    npTitle.textContent = channels[currentIndex].title;
-  } else {
-    nowPlaying.classList.remove('visible');
-  }
 }
 function updateStatus(active) {
   statusPill.classList.toggle('active', active);
