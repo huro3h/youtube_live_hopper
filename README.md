@@ -1,0 +1,2 @@
+# youtube_live_hopper
+YouTube Liveの配信一覧を表示し、配信終了時に自動で次のチャンネルへ切り替えるChrome拡張機能
