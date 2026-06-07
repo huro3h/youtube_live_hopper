@@ -2,12 +2,13 @@
 
 YouTube Liveの配信一覧を表示し、配信終了時に自動で次のチャンネルへ切り替えるChrome拡張機能です。
 
-<img height="500" alt="s_6" src="https://github.com/user-attachments/assets/948a23e4-3a85-4149-abdb-9e9e3a8138da" />
+<img height="500" alt="s-2" src="https://github.com/user-attachments/assets/1fed9d9f-697f-4808-b792-4fcac2c6c24d" />
+<br>
+<br>
 
-
-  
 拡張機能の作者(@huro3h)はゲームのLive配信を流しっぱなしにしながら、同じゲームをすることが多いですが  
 配信終了の度にコントローラーから手を離して、Live中のチャンネルを手動で切り替えるのが面倒と感じたのがモチベーションです  
+また長時間流しっぱなしにするので、配信開始時刻と経過時刻が一覧画面上でわかるようになればと思いこれらの情報を寄せました
   
 ゲームや趣味のジャンルをBGM代わりに流し見したいときに使えます。  
 Chrome Web Storeには公開していないため、手動でインストールして使用してください。
