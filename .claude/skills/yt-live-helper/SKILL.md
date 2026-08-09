@@ -143,6 +143,26 @@ invokes YouTube's own dismiss.
   (which would not re-run) — verify if switching videos ever stops
   auto-switching.
 
+## Backlog / future work
+
+- **Hide creator polls in chat (requested, deferred).** Creators sometimes run
+  a poll (アンケート) in live chat that shows as a banner much like a pinned
+  message; the user wants that auto-hidden too. Deferred only because no live
+  stream was running a poll at request time — this needs verifying against a
+  real poll, not implementing blind.
+  - **Lead:** the poll is another banner inside the same
+    `yt-live-chat-banner-manager`, but a *different* renderer — almost
+    certainly `yt-live-chat-banner-poll-renderer` (confirm the exact tag on a
+    real poll). The current `hidePinned` CSS deliberately scopes to
+    `yt-live-chat-banner-renderer:has(yt-live-chat-text-message-renderer)`, so
+    polls are **not** matched today. Extending is likely a one-line extra
+    selector (e.g. `yt-live-chat-banner-renderer:has(yt-live-chat-banner-poll-renderer){display:none!important}`).
+  - **Open decision:** fold into the existing `固定メッセージを自動で非表示`
+    toggle (`hidePinned`), or add a separate toggle (e.g. `hidePolls`). Lean
+    toward a separate toggle so each can be controlled independently, but ask.
+  - **Verify** via the `browser-testing` skill on a stream with an active poll
+    (banner `display:none`, manager collapses to height 0), same as `hidePinned`.
+
 ## Removed: live elapsed-time display (`elapsed.js`)
 
 A second feature was built and then removed at the user's request: a MAIN-world
