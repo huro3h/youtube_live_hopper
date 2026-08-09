@@ -49,11 +49,13 @@ version — verify against current `manifest.json`/`content.js` before trusting
 it.
 
 **Rename:** the project was renamed `youtube_live_hopper` / `YouTubeLiveHopper`
-→ repo `yt-live-helper`, display name `YouTube Live Helper` (to match the
-`yt-*` prefix of sibling extensions like `yt-auto-quality-lite`, and because
-"Hopper" was a leftover from the removed channel-hopper). The local checkout
-directory is still `.../projects/youtube_live_hopper` — only the repo/display/
-skill names changed, not the working-copy path.
+→ repo `yt-live-helper`, display name `YouTube Live Helper`, skill
+`yt-live-helper`, and the local working-copy directory
+`~/projects/yt-live-helper` (to match the `yt-*` prefix of sibling extensions
+like `yt-auto-quality-lite`, and because "Hopper" was a leftover from the
+removed channel-hopper). Note the Claude Code project-memory dir is still keyed
+to the old path (`-Users-huro3h-projects-youtube-live-hopper`) — that key is
+frozen at creation and doesn't follow the directory rename.
 
 ## How it works now
 
