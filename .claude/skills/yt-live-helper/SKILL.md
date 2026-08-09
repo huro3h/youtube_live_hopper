@@ -31,6 +31,21 @@ Four features today, each with its own popup toggle (all stored in
 Popup labels are plain text (no leading emoji — an earlier ⚡/💬 pass was
 removed at the user's request).
 
+## Release / changelog workflow (follow this)
+
+The repo keeps a `CHANGELOG.md` (Keep a Changelog format, SemVer, Japanese,
+newest on top) — the user relies on it in place of GitHub Releases. **Whenever
+you make a user-facing change here, add a bullet to the `[Unreleased]` section
+of `CHANGELOG.md` in the same commit as the change** (Added / Changed / Fixed /
+Removed). This is a standing request from the user, not optional.
+
+- Internal-only changes (skill notes, tests, refactors, README/doc tweaks with
+  no user-visible effect) do **not** get a changelog entry.
+- On release: bump `manifest.json` `version`, rename `[Unreleased]` →
+  `[X.Y.Z] - YYYY-MM-DD`, add a fresh empty `[Unreleased]` above it, and tag
+  `git tag -a X.Y.Z` (no `v` prefix — matches existing `1.0.0`/`1.1.0`/`2.5.0`
+  and the SemVer string). Push over SSH; `gh` is intentionally not used here.
+
 ## History — this used to be a much bigger extension
 
 The original v1 was a full "channel hopper": YouTube Data API v3 keyword
