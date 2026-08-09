@@ -1,6 +1,7 @@
 // chat.js — ライブチャットの視聴補助（live_chat iframe 内 / all_frames）
 //   (1) 表示を「トップチャット」→「チャット(すべて表示)」へ自動切り替え
 //   (2) 配信主の固定メッセージ(ピン留めバナー)を自分の画面から自動で非表示
+//   (3) 配信主のアンケート(チャット最下部のパネル)を自分の画面から自動で非表示
 // watch 本体ページ側の content.js とは別プロセス。純粋な DOM/CSS 操作のみ。
 
 (function () {
@@ -13,24 +14,42 @@
   const POLL_INTERVAL_MS = 300;
 
   // ---------------------------------------------------------------------------
-  // (2) 固定メッセージの非表示 — CSS 注入方式
+  // (2)(3) 固定メッセージ / アンケートの非表示 — CSS 注入方式
   // ---------------------------------------------------------------------------
-  // 要素を消す/クリックするのではなく <style> を挿すだけ。再ピン留めされた新しい
-  // バナーにも自動で効き、MutationObserver も不要。YouTube の「固定を解除」は押さ
-  // ないので、モデレーター/オーナーであっても他視聴者には一切影響しない。
-  // テキストメッセージを含むバナー(=固定メッセージ)だけを狙い、アンケート等の他
-  // バナーは対象外。中身が消えるとバナーマネージャは高さ0に畳まれる。
-  const HIDE_STYLE_ID = 'ylh-hide-pinned';
-  const HIDE_CSS =
-    'yt-live-chat-banner-renderer:has(yt-live-chat-text-message-renderer){display:none!important;}';
+  // 要素を消す/クリックするのではなく <style> を挿すだけ。再表示された新しい要素に
+  // も自動で効き、MutationObserver も不要。YouTube の「固定を解除」等は押さないので、
+  // モデレーター/オーナーであっても他視聴者には一切影響しない。
+  //
+  // - 固定メッセージ: テキストメッセージを含むバナーだけを狙う（アンケート等の他
+  //   バナーは対象外）。中身が消えるとバナーマネージャは高さ0に畳まれる。
+  // - アンケート: チャット最下部の #action-panel 内 yt-live-chat-poll-renderer。
+  //   アンケートの格納先はチャット表示モードで変わる:
+  //     ・トップチャット → 最下部の #action-panel 内
+  //     ・すべて表示     → 上部のバナーマネージャ内の banner-renderer へ移動し、
+  //                        しかも 32px の壊れたスタブとして描画される
+  //   両方の格納先を狙うことで、どのモードでも綺麗に消え、崩れたスタブも解消する。
+  const HIDE_STYLES = {
+    hidePinned: {
+      id: 'ylh-hide-pinned',
+      css: 'yt-live-chat-banner-renderer:has(yt-live-chat-text-message-renderer){display:none!important;}',
+    },
+    hidePolls: {
+      id: 'ylh-hide-polls',
+      css:
+        '#action-panel:has(yt-live-chat-poll-renderer),' +
+        'yt-live-chat-banner-renderer:has(yt-live-chat-poll-renderer)' +
+        '{display:none!important;}',
+    },
+  };
 
-  function applyHidePinned(on) {
-    const existing = document.getElementById(HIDE_STYLE_ID);
+  function applyStyle(key, on) {
+    const def = HIDE_STYLES[key];
+    const existing = document.getElementById(def.id);
     if (on) {
       if (existing) return;
       const s = document.createElement('style');
-      s.id = HIDE_STYLE_ID;
-      s.textContent = HIDE_CSS;
+      s.id = def.id;
+      s.textContent = def.css;
       (document.head || document.documentElement).appendChild(s);
     } else if (existing) {
       existing.remove();
@@ -103,17 +122,21 @@
   // ---------------------------------------------------------------------------
   // 初期化 & 設定の反映
   // ---------------------------------------------------------------------------
-  chrome.storage.local.get(['allChat', 'hidePinned'], (stored) => {
+  chrome.storage.local.get(['allChat', 'hidePinned', 'hidePolls'], (stored) => {
     const allChat = typeof stored.allChat === 'boolean' ? stored.allChat : true;
     const hidePinned =
       typeof stored.hidePinned === 'boolean' ? stored.hidePinned : true;
-    if (hidePinned) applyHidePinned(true);
+    const hidePolls =
+      typeof stored.hidePolls === 'boolean' ? stored.hidePolls : true;
+    if (hidePinned) applyStyle('hidePinned', true);
+    if (hidePolls) applyStyle('hidePolls', true);
     if (allChat) startAllChat();
   });
 
-  // 固定メッセージ非表示トグルはページ再読み込みなしで即時反映（CSS の付け外し）
+  // 非表示トグルはページ再読み込みなしで即時反映（CSS の付け外し）
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
-    if (changes.hidePinned) applyHidePinned(changes.hidePinned.newValue !== false);
+    if (changes.hidePinned) applyStyle('hidePinned', changes.hidePinned.newValue !== false);
+    if (changes.hidePolls) applyStyle('hidePolls', changes.hidePolls.newValue !== false);
   });
 })();

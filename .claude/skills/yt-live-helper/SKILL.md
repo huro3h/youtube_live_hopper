@@ -1,6 +1,6 @@
 ---
 name: yt-live-helper
-description: Architecture and history for the yt-live-helper Chrome extension (formerly youtube_live_hopper / YouTubeLiveHopper; a small grab-bag of YouTube Live viewing conveniences — auto-seeks live pages to the live head, switches live chat from "Top chat" to "all chat", and hides the creator's pinned-message banner locally). Use when extending or debugging this extension, understanding why it was pared down from a multi-feature channel-hopper before growing back into a small convenience collection, or dealing with the MAIN/ISOLATED content-script world split.
+description: Architecture and history for the yt-live-helper Chrome extension (formerly youtube_live_hopper / YouTubeLiveHopper; a small grab-bag of YouTube Live viewing conveniences — auto-seeks live pages to the live head, switches live chat from "Top chat" to "all chat", and locally hides the creator's pinned-message banner and in-chat polls). Use when extending or debugging this extension, understanding why it was pared down from a multi-feature channel-hopper before growing back into a small convenience collection, or dealing with the MAIN/ISOLATED content-script world split.
 ---
 
 # yt-live-helper — development notes
@@ -12,7 +12,7 @@ A minimal, dependency-free Manifest V3 Chrome extension: a small grab-bag of
 adding a feature no longer requires editing it — do **not** narrow it back to
 a single-feature sentence.
 
-Three features today, each with its own popup toggle (all stored in
+Four features today, each with its own popup toggle (all stored in
 `chrome.storage.local`, default `true`):
 
 - **Live-head auto-seek** (`常に最新位置から再生`, key `jumpToLive`) — on opening
@@ -23,6 +23,10 @@ Three features today, each with its own popup toggle (all stored in
 - **Pinned-message auto-hide** (`固定メッセージを自動で非表示`, key `hidePinned`)
   — hide the creator's pinned-message banner from *your own* view via injected
   CSS. `chat.js`. Purely local; never touches YouTube's "unpin" action.
+- **Poll auto-hide** (`アンケートを自動で非表示`, key `hidePolls`) — hide the
+  creator's in-chat poll from *your own* view via injected CSS. `chat.js`.
+  Purely local. Also cleans up the broken poll stub YouTube leaves in all-chat
+  mode (see chat.js notes).
 
 Popup labels are plain text (no leading emoji — an earlier ⚡/💬 pass was
 removed at the user's request).
@@ -98,7 +102,7 @@ scripts reach subframes only when `all_frames` is set. This is a **separate
 watch/live URLs), so `content.js` never runs in the chat frame and `chat.js`
 never runs in the top frame. Purely DOM/CSS — no player methods — so ISOLATED
 world is fine (no MAIN-world bridge needed). Handles two features (`allChat`,
-`hidePinned`), both read once from `chrome.storage.local` on load.
+`hidePinned`, `hidePolls`), read once from `chrome.storage.local` on load.
 
 **Pinned-message hide (`hidePinned`).** Injects one `<style id="ylh-hide-pinned">`
 into the chat iframe:
@@ -121,6 +125,28 @@ invokes YouTube's own dismiss.
   - Verified end-to-end with the extension loaded in Brave: style injected,
     banner renderer `display:none`, manager height 0 (and `allChat` switched to
     "チャット" in the same run).
+
+**Poll hide (`hidePolls`).** Injects one `<style id="ylh-hide-polls">`:
+`#action-panel:has(yt-live-chat-poll-renderer),yt-live-chat-banner-renderer:has(yt-live-chat-poll-renderer){display:none!important;}`.
+The creator's in-chat poll is `yt-live-chat-poll-renderer`, and — the
+non-obvious part, learned via Playwright/Brave on a live poll — **its container
+moves depending on the chat view mode**:
+  - **Top chat:** the poll lives in `#action-panel` (bottom of chat), rendered
+    correctly (~174px).
+  - **All chat:** YouTube *moves* the poll up into
+    `yt-live-chat-banner-manager` as a `yt-live-chat-banner-renderer`, and there
+    renders it as a **broken ~32px stub** (only the first choice, no question).
+    This is native YouTube behavior — reproduced identically **without** the
+    extension by manually switching to all-chat, so it is *not* our bug; our
+    `allChat` feature just surfaces it every time. Since YouTube won't render
+    the poll properly in all-chat anyway, hiding it cleanly is the right fix
+    (and it's what the user wanted regardless).
+  - Hence the CSS targets **both** containers. `#action-panel:has(poll)` fully
+    collapses the bottom panel to 0; `banner-renderer:has(poll)` kills the
+    all-chat stub. Verified E2E (extension loaded, all-chat): both style
+    elements present, poll height 0, no stub in the screenshot.
+  - Because `hidePinned` is scoped to `:has(yt-live-chat-text-message-renderer)`
+    it never touched the poll banner — that's why polls needed their own rule.
 
 **All-view switch (`allChat`).**
 
@@ -145,23 +171,11 @@ invokes YouTube's own dismiss.
 
 ## Backlog / future work
 
-- **Hide creator polls in chat (requested, deferred).** Creators sometimes run
-  a poll (アンケート) in live chat that shows as a banner much like a pinned
-  message; the user wants that auto-hidden too. Deferred only because no live
-  stream was running a poll at request time — this needs verifying against a
-  real poll, not implementing blind.
-  - **Lead:** the poll is another banner inside the same
-    `yt-live-chat-banner-manager`, but a *different* renderer — almost
-    certainly `yt-live-chat-banner-poll-renderer` (confirm the exact tag on a
-    real poll). The current `hidePinned` CSS deliberately scopes to
-    `yt-live-chat-banner-renderer:has(yt-live-chat-text-message-renderer)`, so
-    polls are **not** matched today. Extending is likely a one-line extra
-    selector (e.g. `yt-live-chat-banner-renderer:has(yt-live-chat-banner-poll-renderer){display:none!important}`).
-  - **Open decision:** fold into the existing `固定メッセージを自動で非表示`
-    toggle (`hidePinned`), or add a separate toggle (e.g. `hidePolls`). Lean
-    toward a separate toggle so each can be controlled independently, but ask.
-  - **Verify** via the `browser-testing` skill on a stream with an active poll
-    (banner `display:none`, manager collapses to height 0), same as `hidePinned`.
+- _(none open right now)_ — the poll-hide request was implemented as the
+  `hidePolls` feature; see "Poll hide" under How it works now. Note the real
+  poll tag turned out to be `yt-live-chat-poll-renderer` (not the guessed
+  `yt-live-chat-banner-poll-renderer`), and its container moves between
+  `#action-panel` and the banner manager depending on chat view mode.
 
 ## Removed: live elapsed-time display (`elapsed.js`)
 
@@ -214,7 +228,7 @@ bridges with `CustomEvent`s.)
   backwards, then navigate to another live video via a YouTube link — it
   should land at the live edge automatically, the chat should switch from
   "トップチャット" to "チャット" on its own, and any creator-pinned message
-  banner should stay hidden.
+  banner or in-chat poll should stay hidden.
 - **E2E.** Use the shared **`browser-testing`** skill (Playwright + Brave
   Browser Nightly; its Recipe B loads the unpacked extension). Project-specific
   bits: the live chat is a same-origin subframe, so grab it with
@@ -224,12 +238,13 @@ bridges with `CustomEvent`s.)
   `allChat` switched to "チャット" in the same run). An older Puppeteer +
   Chrome-for-Testing recipe from the `yt-auto-quality-lite` skill also works.
 - `seekToLiveHead()`/`.ytp-live-badge` (player), `#view-selector` +
-  `tp-yt-paper-listbox` (chat mode dropdown), and
-  `yt-live-chat-banner-renderer` / `yt-live-chat-banner-manager` (pinned banner)
-  are all unofficial/internal YouTube surfaces (same caveat as
-  `yt-auto-quality-lite`'s quality-forcing API) — fragile to YouTube UI changes,
-  no official replacement exists. The pinned-hide CSS relies on `:has()` (fine
-  in current Chromium/Brave; `CSS.supports('selector(:has(*))')` was true).
+  `tp-yt-paper-listbox` (chat mode dropdown),
+  `yt-live-chat-banner-renderer` / `yt-live-chat-banner-manager` (pinned banner),
+  and `yt-live-chat-poll-renderer` / `#action-panel` (poll) are all
+  unofficial/internal YouTube surfaces (same caveat as `yt-auto-quality-lite`'s
+  quality-forcing API) — fragile to YouTube UI changes, no official replacement
+  exists. The pinned/poll-hide CSS relies on `:has()` (fine in current
+  Chromium/Brave; `CSS.supports('selector(:has(*))')` was true).
 - Old `chrome.storage.local` keys from v1 (`apiKey`, `topicChannels`,
   `channels`, `currentIndex`, `autoHop`, `lastQuery`) are simply orphaned on
   upgrade, not migrated or cleared — harmless unused data, not worth the
