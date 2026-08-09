@@ -4,8 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>YouTube Live Hopper</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #0a0a0f;
@@ -14,426 +12,28 @@
       --border: #2a2a3d;
       --accent: #ff3d6b;
       --accent2: #7c3aed;
-      --live: #ff3d6b;
       --text: #f0f0f8;
       --text-muted: #6b6b8a;
       --text-dim: #b8b8d0;
-      --success: #22d3a0;
-      --radius: 10px;
-    }
-
-    html {
-      height: 640px;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      width: 420px;
-      height: 640px;
+      width: 300px;
       background: var(--bg);
       color: var(--text);
-      font-family: 'DM Sans', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 13px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
     }
 
-    /* Header */
-    .header {
-      padding: 10px 16px;
-      background: linear-gradient(135deg, #13131a 0%, #1a1025 100%);
-      border-bottom: 1px solid var(--border);
-      position: relative;
-      overflow: hidden;
+    .section {
+      padding: 16px 18px;
     }
-    .header::before {
-      content: '';
-      position: absolute;
-      top: -40px; right: -40px;
-      width: 120px; height: 120px;
-      background: radial-gradient(circle, rgba(255,61,107,0.15) 0%, transparent 70%);
-      pointer-events: none;
-    }
-    .header-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 6px;
-    }
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      min-width: 0;
-      flex-shrink: 1;
-    }
-    .logo-icon {
-      width: 20px; height: 20px;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      border-radius: 6px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 10px;
-      flex-shrink: 0;
-    }
-    .logo-text {
-      font-family: 'Syne', sans-serif;
-      font-weight: 800;
-      font-size: 11px;
-      letter-spacing: -0.2px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .logo-text span { color: var(--accent); }
-
-    .status-pill {
-      display: flex; align-items: center; gap: 4px;
-      padding: 3px 8px;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      font-size: 10px;
-      color: var(--text-muted);
-      font-weight: 500;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-    .status-pill.active { color: var(--success); border-color: rgba(34,211,160,0.3); }
-    .status-dot {
-      width: 5px; height: 5px;
-      border-radius: 50%;
-      background: var(--text-muted);
-    }
-    .status-pill.active .status-dot {
-      background: var(--success);
-      box-shadow: 0 0 6px var(--success);
-      animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-      0%,100% { opacity: 1; }
-      50% { opacity: 0.4; }
-    }
-
-    /* API Key section */
-    .section { padding: 14px 20px; border-bottom: 1px solid var(--border); }
-    .section-label {
-      font-family: 'Syne', sans-serif;
-      font-weight: 600;
-      font-size: 10px;
-      letter-spacing: 1.2px;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin-bottom: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .search-mode {
-      display: flex;
-      gap: 2px;
-    }
-    .search-mode label {
-      display: flex;
-      align-items: center;
-      gap: 3px;
-      padding: 2px 7px;
-      border-radius: 20px;
-      border: 1px solid var(--border);
-      font-size: 10px;
-      font-family: 'DM Sans', sans-serif;
-      color: var(--text-muted);
-      cursor: pointer;
-      transition: all 0.15s;
-      letter-spacing: 0.3px;
-    }
-    .search-mode input[type="radio"] { display: none; }
-    .search-mode input[type="radio"]:checked + span {
-      color: var(--accent);
-    }
-    .search-mode label:has(input:checked) {
-      border-color: var(--accent);
-      background: rgba(255,61,107,0.08);
-      color: var(--accent);
-    }
-
-    .input-row {
-      display: flex;
-      gap: 6px;
-    }
-    input[type="text"], input[type="password"] {
-      flex: 1;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      color: var(--text);
-      padding: 8px 12px;
-      font-size: 12px;
-      font-family: 'DM Sans', sans-serif;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-    input:focus { border-color: var(--accent2); }
-    input::placeholder { color: var(--text-muted); }
-
-    /* Search / Genre */
-    .genre-row {
-      display: flex;
-      gap: 6px;
-    }
-    .genre-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 5px;
-      margin-top: 8px;
-    }
-    .chip {
-      padding: 4px 10px;
-      border-radius: 20px;
-      border: 1px solid var(--border);
-      background: var(--surface2);
-      color: var(--text-dim);
-      font-size: 11px;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .chip:hover { border-color: var(--accent); color: var(--accent); }
-    .chip.active {
-      background: rgba(255,61,107,0.12);
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-
-    /* Buttons */
-    .btn {
-      padding: 8px 14px;
-      border-radius: var(--radius);
-      border: none;
-      font-family: 'Syne', sans-serif;
-      font-weight: 700;
-      font-size: 12px;
-      cursor: pointer;
-      transition: all 0.15s;
-      letter-spacing: 0.3px;
-      white-space: nowrap;
-    }
-    .btn-primary {
-      background: linear-gradient(135deg, var(--accent), #e0204a);
-      color: #fff;
-    }
-    .btn-primary:hover { opacity: 0.85; transform: translateY(-1px); }
-    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-    .btn-ghost {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      color: var(--text-dim);
-    }
-    .btn-ghost:hover { border-color: var(--accent2); color: var(--text); }
-    .btn-sm { padding: 6px 10px; font-size: 11px; }
-
-    /* Channel list */
-    .channel-list {
-      flex: 1;
-      overflow-y: auto;
-      scrollbar-width: thin;
-      scrollbar-color: var(--border) transparent;
-    }
-    .section-header {
-      padding: 6px 20px;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.8px;
-      color: var(--text-muted);
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      border-top: 1px solid var(--border);
-      text-transform: uppercase;
-      position: sticky;
-      top: 0;
-      z-index: 1;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .section-header-left {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .section-count {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 1px 7px;
-      font-size: 10px;
-      color: var(--text-muted);
-      font-weight: 600;
-      letter-spacing: 0;
-    }
-    .offline-badge {
-      font-size: 9px;
-      font-weight: 700;
-      color: var(--text-muted);
-      padding: 1px 5px;
-      border-radius: 3px;
-      background: var(--surface2);
-      letter-spacing: 0.5px;
-    }
-    .channel-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 9px 20px;
-      border-bottom: 1px solid rgba(42,42,61,0.5);
-      cursor: pointer;
-      transition: background 0.15s;
-      position: relative;
-    }
-    .channel-item:hover { background: var(--surface2); }
-    .channel-item.selected { background: rgba(124,58,237,0.08); }
-    .channel-item.playing { background: rgba(255,61,107,0.07); }
-
-    .channel-thumb {
-      width: 36px; height: 36px;
-      border-radius: 50%;
-      object-fit: cover;
-      background: var(--surface2);
-      flex-shrink: 0;
-      border: 2px solid transparent;
-    }
-    .channel-item.playing .channel-thumb { border-color: var(--live); }
-
-    .channel-info { flex: 1; min-width: 0; }
-    .channel-name-row {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      min-width: 0;
-    }
-    .channel-name {
-      font-weight: 500;
-      font-size: 12px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      color: var(--text);
-      min-width: 0;
-    }
-    .live-badge {
-      display: flex; align-items: center; gap: 2px;
-      background: var(--live);
-      color: #fff;
-      font-size: 8px;
-      font-weight: 700;
-      padding: 1px 4px;
-      border-radius: 3px;
-      letter-spacing: 0.3px;
-      flex-shrink: 0;
-    }
-    .channel-title {
-      font-size: 10px;
-      color: var(--text-dim);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      margin-top: 1px;
-    }
-    .channel-meta {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 2px;
-      min-width: 0;
-    }
-    .viewer-count {
-      font-size: 10px;
-      color: var(--text-dim);
-      flex-shrink: 0;
-    }
-    .channel-elapsed {
-      font-size: 10px;
-      color: var(--text-dim);
-    }
-
-    .channel-actions {
-      display: flex;
-      gap: 4px;
-      opacity: 0;
-      transition: opacity 0.15s;
-    }
-    .channel-item:hover .channel-actions { opacity: 1; }
-
-    /* Controls */
-    .controls {
-      padding: 12px 20px;
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .control-left { display: flex; gap: 6px; }
-
-    /* Loading */
-    .loading {
-      padding: 30px 20px;
-      text-align: center;
-      color: var(--text-muted);
-      display: none;
-    }
-    .loading.visible { display: block; }
-    .spinner {
-      width: 24px; height: 24px;
-      border: 2px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto 10px;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* Empty state */
-    .empty {
-      padding: 30px 20px;
-      text-align: center;
-      color: var(--text-muted);
-      display: none;
-    }
-    .empty.visible { display: block; }
-    .empty-icon { font-size: 28px; margin-bottom: 8px; }
-    .empty-text { font-size: 12px; line-height: 1.6; }
-
-    /* Toast */
-    .toast {
-      position: fixed;
-      bottom: 12px; left: 50%;
-      transform: translateX(-50%) translateY(20px);
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-size: 11px;
-      color: var(--text-dim);
-      opacity: 0;
-      transition: all 0.25s;
-      pointer-events: none;
-      white-space: nowrap;
-      z-index: 999;
-    }
-    .toast.show {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-    .toast.error { border-color: var(--accent); color: var(--accent); }
-    .toast.success { border-color: var(--success); color: var(--success); }
-
-    /* Auto-hop toggle */
     .toggle-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 10px 20px;
-      border-top: 1px solid var(--border);
     }
     .toggle-label { font-size: 12px; color: var(--text-dim); }
     .toggle {
@@ -444,6 +44,7 @@
       position: relative;
       cursor: pointer;
       transition: background 0.2s;
+      flex-shrink: 0;
     }
     .toggle.on { background: var(--accent); border-color: var(--accent); }
     .toggle::after {
@@ -457,122 +58,35 @@
     }
     .toggle.on::after { transform: translateX(16px); }
 
-    /* API key badge in header */
-    .api-key-badge {
-      display: none;
-      align-items: center;
-      gap: 4px;
-      padding: 3px 8px;
-      background: rgba(34,211,160,0.1);
-      border: 1px solid rgba(34,211,160,0.3);
+    .toast {
+      position: fixed;
+      bottom: 10px; left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      padding: 6px 14px;
       border-radius: 20px;
-      font-size: 10px;
-      color: var(--success);
-      cursor: pointer;
-      transition: all 0.15s;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-    .api-key-badge:hover {
-      background: rgba(34,211,160,0.18);
-    }
-    .api-key-badge.visible { display: flex; }
-
-    /* API key section collapse */
-    .api-key-section {
-      overflow: hidden;
-      transition: max-height 0.25s ease, opacity 0.25s ease, padding 0.25s ease;
-      max-height: 80px;
-      opacity: 1;
-    }
-    .api-key-section.collapsed {
-      max-height: 0;
+      font-size: 11px;
+      color: var(--text-dim);
       opacity: 0;
-      padding-top: 0 !important;
-      padding-bottom: 0 !important;
+      transition: all 0.25s;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
     }
   </style>
 </head>
 <body>
 
-<div class="header">
-  <div class="header-top">
-    <div class="logo">
-      <div class="logo-icon">▶</div>
-      <div class="logo-text">YouTubeLive<span>Hopper</span></div>
-    </div>
-    <div style="display:flex;gap:6px;align-items:center;">
-      <div class="api-key-badge" id="apiKeyBadge" title="クリックしてAPIキーを再設定">🔑 設定済み</div>
-      <div class="status-pill" id="statusPill">
-        <div class="status-dot"></div>
-        <span id="statusText">待機中</span>
-      </div>
-    </div>
+<div class="section">
+  <div class="toggle-row">
+    <span class="toggle-label">⚡ 常に最新位置から再生</span>
+    <div class="toggle on" id="jumpToLiveToggle"></div>
   </div>
 </div>
-
-<!-- API Key -->
-<div class="section api-key-section" id="apiKeySection" style="border-bottom:none; padding-bottom:8px;">
-  <div class="section-label">YouTube API Key</div>
-  <div class="input-row">
-    <input type="text" id="apiKeyInput" placeholder="AIza..." style="-webkit-text-security: disc;" />
-    <button class="btn btn-ghost btn-sm" id="saveKeyBtn">保存</button>
-  </div>
-</div>
-
-<!-- Genre Search -->
-<div class="section" style="border-bottom:none; padding-top:10px; padding-bottom:8px;">
-  <div class="section-label">
-    <span>ジャンル検索</span>
-    <div class="search-mode">
-      <label><input type="radio" name="searchMode" value="and" checked><span>AND</span></label>
-      <label><input type="radio" name="searchMode" value="or"><span>OR</span></label>
-    </div>
-  </div>
-  <div class="genre-row">
-    <input type="text" id="queryInput" placeholder="キーワード or トピックID (UC...)" style="flex:1" />
-    <button class="btn btn-primary btn-sm" id="searchBtn">検索 / 登録</button>
-  </div>
-  <div id="apiKeyPrompt" style="display:none; margin-top:6px; font-size:11px; color:var(--text-muted);">
-    🔑 まずAPIキーを入力・保存してください
-  </div>
-</div>
-
-<!-- Auto-hop toggle + Controls -->
-<div class="toggle-row" style="border-top: 1px solid var(--border);">
-  <span class="toggle-label">🔁 自動切り替え（終了時）</span>
-  <div class="toggle on" id="autoHopToggle"></div>
-</div>
-
-<!-- Jump to live toggle -->
-<div class="toggle-row">
-  <span class="toggle-label">⚡ 常に最新位置から再生</span>
-  <div class="toggle on" id="jumpToLiveToggle"></div>
-</div>
-
-<!-- Controls -->
-<div class="controls">
-  <div class="control-left">
-    <button class="btn btn-ghost btn-sm" id="prevBtn" disabled>⏮ 前へ</button>
-    <button class="btn btn-ghost btn-sm" id="nextBtn" disabled>次へ ⏭</button>
-  </div>
-  <button class="btn btn-ghost btn-sm" id="refreshBtn">🔄</button>
-</div>
-
-<!-- Loading -->
-<div class="loading" id="loading">
-  <div class="spinner"></div>
-  <div>配信を検索中...</div>
-</div>
-
-<!-- Empty -->
-<div class="empty" id="empty">
-  <div class="empty-icon">📡</div>
-  <div class="empty-text">ライブ配信が見つかりませんでした<br>別のキーワードで試してください</div>
-</div>
-
-<!-- Channel List -->
-<div class="channel-list" id="channelList"></div>
 
 <div class="toast" id="toast"></div>
 

@@ -1,156 +1,69 @@
-// content.js — YouTubeページに注入されるスクリプト
+// content.js — ライブ配信ページにアクセスした瞬間に最新位置(ライブヘッド)へシークする
 
 (function () {
   'use strict';
 
-  let observer = null;
-  let checkTimer = null;
-  let hasNotified = false;
-  let currentVideoId = null;
-  let initTimer = null;
-  let isLiveConfirmed = false;
+  const MAX_WAIT_MS = 15000;
+  const POLL_INTERVAL_MS = 300;
 
-  function bootstrap() {
-    const videoId = new URLSearchParams(location.search).get('v');
-    if (!videoId || videoId === currentVideoId) return;
+  let lastVideoId = null;
+  let jumpToLive = true;
 
-    currentVideoId = videoId;
-    hasNotified = false;
-    isLiveConfirmed = false;
-    cleanup();
-    waitForLiveBadge();
-  }
-
-  // ライブバッジが表示されるまで待ってから監視開始（誤検知防止）
-  function waitForLiveBadge() {
-    let attempts = 0;
-    function tick() {
-      if (hasNotified) return;
-      attempts++;
-      if (document.querySelector('.ytp-live-badge')) {
-        isLiveConfirmed = true;
-        startMonitoring();
-      } else if (attempts < 30) {
-        initTimer = setTimeout(tick, 500);
-      }
+  chrome.storage.local.get('jumpToLive', (stored) => {
+    if (typeof stored.jumpToLive === 'boolean') jumpToLive = stored.jumpToLive;
+  });
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.jumpToLive) {
+      jumpToLive = changes.jumpToLive.newValue;
     }
-    initTimer = setTimeout(tick, 3000);
+  });
+
+  function isWatchPage() {
+    return location.pathname === '/watch' || location.pathname.startsWith('/live/');
   }
 
-  function startMonitoring() {
-    const player = document.getElementById('movie_player');
-    if (player) {
-      observer = new MutationObserver(() => {
-        if (isLiveConfirmed && !hasNotified) checkLiveStatus();
-      });
-      observer.observe(player, { attributes: true, attributeFilter: ['class'] });
+  function getVideoId() {
+    if (location.pathname === '/watch') {
+      return new URLSearchParams(location.search).get('v');
     }
-    checkTimer = setInterval(checkLiveStatus, 60000);
+    const match = location.pathname.match(/^\/live\/([\w-]{11})/);
+    return match ? match[1] : null;
   }
 
-  function checkLiveStatus() {
-    if (hasNotified || !isLiveConfirmed) return;
-    const player = document.getElementById('movie_player');
-    if (player?.classList.contains('ended-mode')) {
-      // 誤検知防止のため3秒後に再確認
-      setTimeout(() => {
-        if (!hasNotified && document.getElementById('movie_player')?.classList.contains('ended-mode')) {
-          notifyEnded();
-        }
-      }, 3000);
-    }
-  }
+  function jumpToLiveHead() {
+    const startedAt = Date.now();
 
-  function notifyEnded() {
-    if (hasNotified) return;
-    hasNotified = true;
-    cleanup();
-    chrome.runtime.sendMessage({ type: 'LIVE_ENDED' }, () => { chrome.runtime.lastError; });
-  }
-
-  function cleanup() {
-    if (observer) { observer.disconnect(); observer = null; }
-    clearInterval(checkTimer);
-    clearTimeout(initTimer);
-  }
-
-  function seekToLiveHead() {
-    const attempt = (tries) => {
-      const player = document.getElementById('movie_player');
-      if (!player) {
-        if (tries > 0) setTimeout(() => attempt(tries - 1), 500);
-        return;
-      }
-
-      // 方法①: ライブバッジをクリック（最も確実）
-      const liveBadge = document.querySelector('.ytp-live-badge');
-      if (liveBadge) {
-        liveBadge.click();
-        // 念押しで方法②も実行
-        if (typeof player.seekToLiveHead === 'function') player.seekToLiveHead();
-        return;
-      }
-
-      // 方法②: プレーヤーAPIを使用
-      if (typeof player.seekToLiveHead === 'function') {
-        const playerState = player.getPlayerState?.();
-        if (playerState === 1 || playerState === 2 || playerState === 3) {
+    (function tick() {
+      const badge = document.querySelector('.ytp-live-badge');
+      if (badge) {
+        // 方法①: ライブバッジをクリック（最も確実）
+        badge.click();
+        // 方法②: プレーヤーAPIも念押しで実行
+        const player = document.getElementById('movie_player');
+        if (player && typeof player.seekToLiveHead === 'function') {
           player.seekToLiveHead();
-          setTimeout(() => {
-            const badge = document.querySelector('.ytp-live-badge');
-            if (badge) badge.click();
-          }, 2000);
-          return;
         }
+        return;
       }
-
-      // どちらもまだ準備できていない場合はリトライ
-      if (tries > 0) setTimeout(() => attempt(tries - 1), 500);
-    };
-    setTimeout(() => attempt(20), 1000);
+      // ライブ配信でない動画では .ytp-live-badge が存在しないため、
+      // MAX_WAIT_MS を過ぎたら諦めて何もしない
+      if (Date.now() - startedAt < MAX_WAIT_MS) {
+        setTimeout(tick, POLL_INTERVAL_MS);
+      }
+    })();
   }
 
-  // YouTube SPA のページ遷移を検知
-  let lastUrl = location.href;
-  const navObserver = new MutationObserver(() => {
-    if (location.href !== lastUrl) {
-      lastUrl = location.href;
-      if (location.pathname === '/watch') setTimeout(bootstrap, 500);
-    }
-  });
-  navObserver.observe(document.body, { childList: true, subtree: true });
+  function handleNavigation() {
+    if (!jumpToLive || !isWatchPage()) return;
 
-  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-    if (msg.type === 'INIT_MONITOR') {
-      hasNotified = false;
-      currentVideoId = null;
-      isLiveConfirmed = false;
-      if (msg.jumpToLive) seekToLiveHead();
-      bootstrap();
-    }
+    const videoId = getVideoId();
+    if (!videoId || videoId === lastVideoId) return;
+    lastVideoId = videoId;
 
-    // ytInitialDataからライブ一覧を取得（InnerTubeより正確）
-    if (msg.type === 'FETCH_YT_INITIAL_DATA') {
-      try {
-        const data = window.ytInitialData;
-        if (!data) { sendResponse({ ok: false, videos: [] }); return; }
+    jumpToLiveHead();
+  }
 
-        const seen = new Set();
-        const videoIds = [];
-        JSON.stringify(data, (key, val) => {
-          if (key === 'videoId' && typeof val === 'string' && !seen.has(val)) {
-            seen.add(val); videoIds.push(val);
-          }
-          return val;
-        });
-
-        sendResponse({ ok: true, videoIds });
-      } catch(e) {
-        sendResponse({ ok: false, videos: [] });
-      }
-    }
-  });
-
-  bootstrap();
-
+  // YouTube は SPA なので通常のページ遷移イベントが発火しない
+  document.addEventListener('yt-navigate-finish', handleNavigation);
+  handleNavigation();
 })();
