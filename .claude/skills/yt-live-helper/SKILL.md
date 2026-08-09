@@ -193,18 +193,14 @@ bridges with `CustomEvent`s.)
   should land at the live edge automatically, the chat should switch from
   "トップチャット" to "チャット" on its own, and any creator-pinned message
   banner should stay hidden.
-- **E2E recipe (Playwright + Brave Browser Nightly).** The chat features were
-  verified with Playwright driving Brave Nightly at
-  `/Applications/Brave Browser Nightly.app/Contents/MacOS/Brave Browser Nightly`
-  via `chromium.launch({ executablePath })` (retail Chrome silently ignores
-  `--load-extension`). To load the extension use
-  `chromium.launchPersistentContext(userDataDir, { executablePath, headless:false,
-  args:['--disable-extensions-except=<repo>','--load-extension=<repo>'] })`;
-  the live chat is a subframe, so grab it with
+- **E2E.** Use the shared **`browser-testing`** skill (Playwright + Brave
+  Browser Nightly; its Recipe B loads the unpacked extension). Project-specific
+  bits: the live chat is a same-origin subframe, so grab it with
   `page.frames().find(f => f.url().includes('live_chat'))` and `evaluate` inside
-  *that frame*. (Older Puppeteer + Chrome-for-Testing recipe from the
-  `yt-auto-quality-lite` skill also works.) Scratchpad scripts `inspect*.js` /
-  `verify_css.js` / `e2e.js` were the working harness.
+  *that frame*. The chat features were verified this way with the extension
+  loaded (style injected, pinned banner `display:none`, manager height 0, and
+  `allChat` switched to "チャット" in the same run). An older Puppeteer +
+  Chrome-for-Testing recipe from the `yt-auto-quality-lite` skill also works.
 - `seekToLiveHead()`/`.ytp-live-badge` (player), `#view-selector` +
   `tp-yt-paper-listbox` (chat mode dropdown), and
   `yt-live-chat-banner-renderer` / `yt-live-chat-banner-manager` (pinned banner)
