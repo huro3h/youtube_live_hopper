@@ -10,6 +10,8 @@
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-08-10
+
 ### Added
 - ポップアップのヘッダーに拡張機能名「YouTube Live Helper」を控えめに表示。
 
