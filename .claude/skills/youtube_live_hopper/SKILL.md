@@ -1,17 +1,15 @@
 ---
 name: youtube_live_hopper
-description: Architecture and history for the youtube_live_hopper Chrome extension (auto-seeks YouTube Live pages to the live head, and shows the stream's elapsed time). Use when extending or debugging this extension, understanding why it was pared down from a multi-feature channel-hopper, or dealing with the MAIN/ISOLATED content-script world split.
+description: Architecture and history for the youtube_live_hopper Chrome extension (auto-seeks YouTube Live pages to the live head on access). Use when extending or debugging this extension, understanding why it was pared down from a multi-feature channel-hopper to a single-purpose auto-seek tool, or dealing with the MAIN/ISOLATED content-script world split.
 ---
 
 # youtube_live_hopper — development notes
 
-A minimal, dependency-free Manifest V3 Chrome extension with two features:
-(1) when a YouTube Live watch page loads (or is navigated to via YouTube's SPA
-router), automatically seek the player to the live head; (2) insert a
-live-updating "（開始からhh:mm:ss経過）" elapsed-time readout next to the
-"◯時間前にライブ配信開始" relative date in the description. One popup toggle
+A minimal, dependency-free Manifest V3 Chrome extension. Its only job: when a
+YouTube Live watch page loads (or is navigated to via YouTube's SPA router),
+automatically seek the player to the live head. One popup toggle
 (`⚡ 常に最新位置から再生`, stored as `chrome.storage.local.jumpToLive`,
-default `true`) can disable the seek if the user wants to catch up from behind
+default `true`) can disable this if the user wants to catch up from behind
 instead.
 
 ## History — this used to be a much bigger extension
@@ -37,16 +35,13 @@ it.
 
 ## How it works now
 
-Two content scripts, both injected on `https://www.youtube.com/watch*` and
-`https://www.youtube.com/live/*` at `document_idle`. No `background.js`, no
-`host_permissions`.
-
-**`content.js` — auto-seek (ISOLATED world, default):**
+`content.js` only (ISOLATED world), injected on
+`https://www.youtube.com/watch*` and `https://www.youtube.com/live/*` at
+`document_idle`. No `background.js`, no `host_permissions`.
 
 - Reads `jumpToLive` from `chrome.storage.local` on load and via
-  `chrome.storage.onChanged` (only the ISOLATED world can touch `chrome.*`),
-  so toggling the popup switch applies without a page reload if the SPA
-  navigates again.
+  `chrome.storage.onChanged`, so toggling the popup switch applies without a
+  page reload if the SPA navigates again.
 - Listens for YouTube's `yt-navigate-finish` document event (the same signal
   used elsewhere in this workspace, e.g. `yt-auto-quality-lite`, to detect
   SPA navigation) plus runs once on initial script load, dedup'd by video ID
@@ -64,38 +59,32 @@ Two content scripts, both injected on `https://www.youtube.com/watch*` and
   `seekToLiveHead()` call is a dead no-op belt kept only because it's
   harmless; don't rely on it as the mechanism.
 
-**`elapsed.js` — live elapsed-time display (MAIN world):**
+## Removed: live elapsed-time display (`elapsed.js`)
 
-- Inserts a "（開始からhh:mm:ss経過）" span **next to** (not replacing) the
-  "◯時間前にライブ配信開始" relative-date text in the description area,
-  updated every second.
-- Gets the exact stream start from
+A second feature was built and then removed at the user's request: a MAIN-world
+`elapsed.js` that inserted a live-updating "（開始からhh:mm:ss経過）" span next
+to the "◯時間前にライブ配信開始" date in the description. It worked in
+end-to-end tests but the user found the flicker not fully suppressible, the
+readout hard to read, and it failed to appear on some videos — so the whole
+feature (the script, its `world: "MAIN"` content-script entry, and the docs)
+was dropped. **If re-attempting**, the notes below are what was learned;
+budget for the flicker/reliability problems being real, not just polish.
+
+- Exact stream start came from
   `player.getPlayerResponse().microformat.playerMicroformatRenderer.liveBroadcastDetails.startTimestamp`
-  (an ISO string), falling back to `window.ytInitialPlayerResponse` at the
-  same path. Elapsed = `Date.now() - new Date(startTimestamp)`.
-- Finds the anchor with `findLiveStartTextEl()`: leaf elements
-  (`el.children.length === 0`) under `ytd-watch-metadata` / `#above-the-fold`
-  / `ytd-watch-flexy #primary` whose trimmed text matches `/ライブ配信開始$/`
-  and is `< 60` chars (avoids comment-section false matches).
-- **Insertion, not replacement (this was a deliberate change).** An earlier
-  version overwrote the date element's `textContent`; that fought YouTube's
-  re-render loop and flickered between our text and the original ~once a
-  second. Now we keep our own `<span id="ylh-elapsed">` and, every tick,
-  re-find the anchor and re-attach our span immediately after it
-  (`anchor.insertAdjacentElement('afterend', el)` only when
-  `anchor.nextElementSibling !== el`). `getElementById` returns null when our
-  span was removed by a re-render (getElementById only returns connected
-  nodes), so we recreate it; otherwise we just move the existing node (no
-  duplicates). This is important: without the per-tick re-position, a
-  re-render that swaps the anchor node leaves our span stranded at its old
-  spot (`adjacent` goes false) even though it's still connected. Residual
-  cosmetic blip: a single ~1s frame where our span is briefly empty/misplaced
-  right at a re-render, self-corrected next tick — accepted, not worth
-  fighting.
-- No `chrome.*` used here, so MAIN world is fine — this feature is always on
-  and independent of the `jumpToLive` toggle.
+  (ISO string), fallback `window.ytInitialPlayerResponse` same path;
+  elapsed = `Date.now() - new Date(startTimestamp)`. `player.getDuration()`
+  is **not** usable for this — during a live broadcast it returns ~1h more
+  than the real elapsed time (appears to include the DVR window).
+- Insert-beside beat overwrite-in-place: overwriting the date element's
+  `textContent` fought YouTube's re-render loop and flickered between our text
+  and the original ~1×/s. Inserting our own `<span id="ylh-elapsed">` after
+  the anchor (re-positioned every tick when `anchor.nextElementSibling !==
+  el`) was better but still had a residual ~1s blip at each re-render, plus
+  the "not appearing on some videos" issue — which is why it was ultimately
+  cut.
 
-### The MAIN vs ISOLATED world gotcha (the key lesson from adding elapsed.js)
+### The MAIN vs ISOLATED world gotcha (keep this lesson even though elapsed.js is gone)
 
 The player's methods (`getPlayerResponse`, `getCurrentTime`,
 `seekToLiveHead`, …) and page globals (`ytInitialPlayerResponse`) are
@@ -103,38 +92,29 @@ attached by YouTube's own page scripts, which run in the **MAIN** world. A
 default content script runs in the **ISOLATED** world: it shares the DOM, so
 `document.getElementById('movie_player')` returns the element and DOM clicks
 work, but the element's YouTube-added methods are **invisible**
-(`typeof player.getPlayerResponse === 'function'` is `false`). That's why the
-elapsed feature *must* be a separate `world: "MAIN"` script and can't live in
-`content.js`.
+(`typeof player.getPlayerResponse === 'function'` is `false`). Any future
+feature that needs to *call* a player method (not just click DOM) must run in
+a `world: "MAIN"` content script.
 
 Debugging trap that cost time here: Puppeteer's `page.evaluate()` runs in the
 MAIN world by default, so a standalone `evaluate` reading `getCurrentTime()`
 *succeeds* and makes the approach look viable — while the same call from the
 ISOLATED content script silently returns nothing. Always confirm which world
 a call needs before assuming an `evaluate` result reflects what a content
-script will see. (Same MAIN/ISOLATED bridging concern as `yt-auto-quality-lite`,
-which uses `CustomEvent`s; here no bridge is needed because the MAIN-world
-script both reads the player and writes the DOM itself.)
-
-Also rejected: `player.getDuration()` for the elapsed value — during a live
-broadcast it returns a value ~1h larger than the real elapsed time (looks
-like it includes the DVR window), so it's unusable. `startTimestamp` is exact.
+script will see. (Same MAIN/ISOLATED concern as `yt-auto-quality-lite`, which
+bridges with `CustomEvent`s.)
 
 ## Scope / known limitations
 
 - No automated tests. Manual check: open a live YouTube stream, seek
   backwards, then navigate to another live video via a YouTube link — it
-  should land at the live edge automatically, and the description should show
-  "開始からhh:mm:ss経過" ticking up.
+  should land at the live edge automatically.
 - Puppeteer + Chrome-for-Testing recipe (from the `yt-auto-quality-lite`
   skill) is what was used to verify end-to-end — retail Chrome silently
-  ignores `--load-extension`. `world: "MAIN"` content scripts load fine that
-  way; verify the elapsed text actually changes over several seconds, not
-  just that it was set once.
-- `seekToLiveHead()`, `.ytp-live-badge`, `getPlayerResponse()` and
-  `ytInitialPlayerResponse` are all unofficial/internal YouTube surfaces
-  (same caveat as `yt-auto-quality-lite`'s quality-forcing API) — fragile to
-  YouTube changes, no official replacement exists.
+  ignores `--load-extension`.
+- `seekToLiveHead()` and `.ytp-live-badge` are unofficial/internal YouTube
+  player surfaces (same caveat as `yt-auto-quality-lite`'s quality-forcing
+  API) — fragile to YouTube UI changes, no official replacement exists.
 - Old `chrome.storage.local` keys from v1 (`apiKey`, `topicChannels`,
   `channels`, `currentIndex`, `autoHop`, `lastQuery`) are simply orphaned on
   upgrade, not migrated or cleared — harmless unused data, not worth the
