@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "YouTubeLiveHopper",
-  "version": "2.0.0",
-  "description": "YouTube Liveの配信ページにアクセスすると自動で最新位置(ライブヘッド)へシークするChrome拡張機能",
+  "version": "2.1.0",
+  "description": "YouTube Liveの配信ページで自動で最新位置(ライブヘッド)へシークし、配信の経過時間を表示するChrome拡張機能",
   "permissions": [
     "storage"
   ],
@@ -21,6 +21,15 @@
         "https://www.youtube.com/live/*"
       ],
       "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.youtube.com/watch*",
+        "https://www.youtube.com/live/*"
+      ],
+      "js": ["elapsed.js"],
+      "world": "MAIN",
       "run_at": "document_idle"
     }
   ],
