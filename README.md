@@ -1,4 +1,4 @@
-# YouTubeLiveHopper
+# YouTube Live Helper
 
 YouTube Liveの視聴を快適にする便利機能を詰め合わせたChrome拡張機能です。
 
@@ -14,7 +14,7 @@ Chrome Web Storeには公開していないため、手動でインストール�
 ## インストール
 
 ```bash
-git clone git@github.com:huro3h/youtube_live_hopper.git
+git clone git@github.com:huro3h/yt-live-helper.git
 ```
 
 1. Chrome で `chrome://extensions` を開く
@@ -28,7 +28,7 @@ git clone git@github.com:huro3h/youtube_live_hopper.git
 
 インストールするだけで動作します。ライブ配信中の動画ページ（`youtube.com/watch?v=...` または `youtube.com/live/...`）にアクセスすると、自動で配信の最新位置までシークし、チャット欄を「すべて表示」に切り替えます。
 
-Chromeツールバーの YouTubeLiveHopper アイコンをクリックすると、以下の設定を切り替えられます。
+Chromeツールバーの YouTube Live Helper アイコンをクリックすると、以下の設定を切り替えられます。
 
 | 設定 | 説明 |
 |------|------|
@@ -57,7 +57,7 @@ Chromeツールバーの YouTubeLiveHopper アイコンをクリックすると�
 ## ファイル構成
 
 ```
-YouTubeLiveHopper/
+yt-live-helper/
 ├── manifest.json     # 拡張機能の設定（Manifest V3）
 ├── popup.html        # ポップアップUI（設定トグルのみ）
 ├── popup.js          # ポップアップのロジック
@@ -100,4 +100,4 @@ Mac、Chrome以外は動作未検証です。動かない場合は自力で何�
 
 ## License
 
-[MIT](https://github.com/huro3h/youtube_live_hopper/blob/main/LICENSE)
+[MIT](https://github.com/huro3h/yt-live-helper/blob/main/LICENSE)

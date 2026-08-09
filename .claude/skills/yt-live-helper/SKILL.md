@@ -1,9 +1,9 @@
 ---
-name: youtube_live_hopper
-description: Architecture and history for the youtube_live_hopper Chrome extension (a small grab-bag of YouTube Live viewing conveniences — auto-seeks live pages to the live head, and switches live chat from "Top chat" to "all chat"). Use when extending or debugging this extension, understanding why it was pared down from a multi-feature channel-hopper before growing back into a small convenience collection, or dealing with the MAIN/ISOLATED content-script world split.
+name: yt-live-helper
+description: Architecture and history for the yt-live-helper Chrome extension (formerly youtube_live_hopper / YouTubeLiveHopper; a small grab-bag of YouTube Live viewing conveniences — auto-seeks live pages to the live head, and switches live chat from "Top chat" to "all chat"). Use when extending or debugging this extension, understanding why it was pared down from a multi-feature channel-hopper before growing back into a small convenience collection, or dealing with the MAIN/ISOLATED content-script world split.
 ---
 
-# youtube_live_hopper — development notes
+# yt-live-helper — development notes
 
 A minimal, dependency-free Manifest V3 Chrome extension: a small grab-bag of
 "make watching YouTube Live nicer" conveniences. Framing note: the manifest
@@ -44,6 +44,13 @@ If a past version of this extension is ever referenced (docs, old commits,
 memory from a prior session), assume it described the removed multi-feature
 version — verify against current `manifest.json`/`content.js` before trusting
 it.
+
+**Rename:** the project was renamed `youtube_live_hopper` / `YouTubeLiveHopper`
+→ repo `yt-live-helper`, display name `YouTube Live Helper` (to match the
+`yt-*` prefix of sibling extensions like `yt-auto-quality-lite`, and because
+"Hopper" was a leftover from the removed channel-hopper). The local checkout
+directory is still `.../projects/youtube_live_hopper` — only the repo/display/
+skill names changed, not the working-copy path.
 
 ## How it works now
 
