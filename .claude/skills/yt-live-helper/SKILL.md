@@ -1,6 +1,6 @@
 ---
 name: yt-live-helper
-description: Architecture and history for the yt-live-helper Chrome extension (formerly youtube_live_hopper / YouTubeLiveHopper; a small grab-bag of YouTube Live viewing conveniences — auto-seeks live pages to the live head, and switches live chat from "Top chat" to "all chat"). Use when extending or debugging this extension, understanding why it was pared down from a multi-feature channel-hopper before growing back into a small convenience collection, or dealing with the MAIN/ISOLATED content-script world split.
+description: Architecture and history for the yt-live-helper Chrome extension (formerly youtube_live_hopper / YouTubeLiveHopper; a small grab-bag of YouTube Live viewing conveniences — auto-seeks live pages to the live head, switches live chat from "Top chat" to "all chat", and hides the creator's pinned-message banner locally). Use when extending or debugging this extension, understanding why it was pared down from a multi-feature channel-hopper before growing back into a small convenience collection, or dealing with the MAIN/ISOLATED content-script world split.
 ---
 
 # yt-live-helper — development notes
@@ -12,14 +12,17 @@ A minimal, dependency-free Manifest V3 Chrome extension: a small grab-bag of
 adding a feature no longer requires editing it — do **not** narrow it back to
 a single-feature sentence.
 
-Two features today, each with its own popup toggle (both stored in
-`chrome.storage.local`, default `true`, read live via `chrome.storage.onChanged`):
+Three features today, each with its own popup toggle (all stored in
+`chrome.storage.local`, default `true`):
 
 - **Live-head auto-seek** (`常に最新位置から再生`, key `jumpToLive`) — on opening
   a live watch page, seek the player to the live head. `content.js`.
 - **Chat auto all-view** (`チャットを常に全表示`, key `allChat`) — switch the live
   chat from the default "トップチャット"(Top chat) to "チャット"(all chat).
   `chat.js`.
+- **Pinned-message auto-hide** (`固定メッセージを自動で非表示`, key `hidePinned`)
+  — hide the creator's pinned-message banner from *your own* view via injected
+  CSS. `chat.js`. Purely local; never touches YouTube's "unpin" action.
 
 Popup labels are plain text (no leading emoji — an earlier ⚡/💬 pass was
 removed at the user's request).
@@ -83,7 +86,7 @@ Two content scripts, no `background.js`, no `host_permissions`. Only the
   `seekToLiveHead()` call is a dead no-op belt kept only because it's
   harmless; don't rely on it as the mechanism.
 
-### Chat auto all-view — `chat.js`
+### Chat features — `chat.js` (all-view switch + pinned-message hide)
 
 `chat.js` (ISOLATED world), injected on `https://www.youtube.com/live_chat*`
 with **`all_frames: true`** — the live chat is a *same-origin iframe*
@@ -91,8 +94,33 @@ with **`all_frames: true`** — the live chat is a *same-origin iframe*
 scripts reach subframes only when `all_frames` is set. This is a **separate
 `content_scripts` entry** from `content.js` (which matches only the top-frame
 watch/live URLs), so `content.js` never runs in the chat frame and `chat.js`
-never runs in the top frame. Purely DOM — no player methods — so ISOLATED
-world is fine (no MAIN-world bridge needed).
+never runs in the top frame. Purely DOM/CSS — no player methods — so ISOLATED
+world is fine (no MAIN-world bridge needed). Handles two features (`allChat`,
+`hidePinned`), both read once from `chrome.storage.local` on load.
+
+**Pinned-message hide (`hidePinned`).** Injects one `<style id="ylh-hide-pinned">`
+into the chat iframe:
+`yt-live-chat-banner-renderer:has(yt-live-chat-text-message-renderer){display:none!important;}`.
+The pinned message is a banner in `yt-live-chat-banner-manager#live-chat-banner`;
+targeting the renderer that *contains a text-message* hides only pinned
+messages (polls etc. stay visible), and the manager collapses from ~44px to 0.
+Toggled live via `chrome.storage.onChanged` (add/remove the style element), no
+reload needed. CSS (not element removal / clicking) was chosen deliberately:
+it auto-applies to re-pinned messages with no MutationObserver, and it never
+invokes YouTube's own dismiss.
+  - **Why not click YouTube's "メッセージの固定を解除" (unpin) menu item:** it
+    exists in the banner's kebab ("チャットの操作") menu and *does* remove the
+    banner — verified via Playwright/Brave that in an anonymous session it drops
+    `has-active-banner` and the renderer count to 0. But "固定を解除" is
+    semantically *unpin*, and for a moderator/owner it would very likely unpin
+    for **all** viewers (can't be tested anonymously). The user chose the
+    local-hide approach precisely to avoid that risk. If you ever revisit,
+    don't switch to clicking that item without solving the mod/owner case.
+  - Verified end-to-end with the extension loaded in Brave: style injected,
+    banner renderer `display:none`, manager height 0 (and `allChat` switched to
+    "チャット" in the same run).
+
+**All-view switch (`allChat`).**
 
 - Reads `allChat` from `chrome.storage.local`; if `true`, runs once. Guards
   with `location.pathname.startsWith('/live_chat')` as a belt.
@@ -162,15 +190,28 @@ bridges with `CustomEvent`s.)
 
 - No automated tests. Manual check: open a live YouTube stream, seek
   backwards, then navigate to another live video via a YouTube link — it
-  should land at the live edge automatically, and the chat should switch from
-  "トップチャット" to "チャット" on its own.
-- Puppeteer + Chrome-for-Testing recipe (from the `yt-auto-quality-lite`
-  skill) is what was used to verify end-to-end — retail Chrome silently
-  ignores `--load-extension`.
-- `seekToLiveHead()`/`.ytp-live-badge` (player) and `#view-selector` +
-  `tp-yt-paper-listbox` (chat mode dropdown) are all unofficial/internal
-  YouTube surfaces (same caveat as `yt-auto-quality-lite`'s quality-forcing
-  API) — fragile to YouTube UI changes, no official replacement exists.
+  should land at the live edge automatically, the chat should switch from
+  "トップチャット" to "チャット" on its own, and any creator-pinned message
+  banner should stay hidden.
+- **E2E recipe (Playwright + Brave Browser Nightly).** The chat features were
+  verified with Playwright driving Brave Nightly at
+  `/Applications/Brave Browser Nightly.app/Contents/MacOS/Brave Browser Nightly`
+  via `chromium.launch({ executablePath })` (retail Chrome silently ignores
+  `--load-extension`). To load the extension use
+  `chromium.launchPersistentContext(userDataDir, { executablePath, headless:false,
+  args:['--disable-extensions-except=<repo>','--load-extension=<repo>'] })`;
+  the live chat is a subframe, so grab it with
+  `page.frames().find(f => f.url().includes('live_chat'))` and `evaluate` inside
+  *that frame*. (Older Puppeteer + Chrome-for-Testing recipe from the
+  `yt-auto-quality-lite` skill also works.) Scratchpad scripts `inspect*.js` /
+  `verify_css.js` / `e2e.js` were the working harness.
+- `seekToLiveHead()`/`.ytp-live-badge` (player), `#view-selector` +
+  `tp-yt-paper-listbox` (chat mode dropdown), and
+  `yt-live-chat-banner-renderer` / `yt-live-chat-banner-manager` (pinned banner)
+  are all unofficial/internal YouTube surfaces (same caveat as
+  `yt-auto-quality-lite`'s quality-forcing API) — fragile to YouTube UI changes,
+  no official replacement exists. The pinned-hide CSS relies on `:has()` (fine
+  in current Chromium/Brave; `CSS.supports('selector(:has(*))')` was true).
 - Old `chrome.storage.local` keys from v1 (`apiKey`, `topicChannels`,
   `channels`, `currentIndex`, `autoHop`, `lastQuery`) are simply orphaned on
   upgrade, not migrated or cleared — harmless unused data, not worth the

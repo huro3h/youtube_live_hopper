@@ -1,5 +1,7 @@
-// chat.js — ライブチャットの表示を「トップチャット」から「チャット(すべて表示)」へ自動切り替え
-// live_chat iframe 内(all_frames)で動作する。watch 本体ページ側の content.js とは別プロセス。
+// chat.js — ライブチャットの視聴補助（live_chat iframe 内 / all_frames）
+//   (1) 表示を「トップチャット」→「チャット(すべて表示)」へ自動切り替え
+//   (2) 配信主の固定メッセージ(ピン留めバナー)を自分の画面から自動で非表示
+// watch 本体ページ側の content.js とは別プロセス。純粋な DOM/CSS 操作のみ。
 
 (function () {
   'use strict';
@@ -10,16 +12,38 @@
   const MAX_WAIT_MS = 15000;
   const POLL_INTERVAL_MS = 300;
 
-  let allChat = true;
+  // ---------------------------------------------------------------------------
+  // (2) 固定メッセージの非表示 — CSS 注入方式
+  // ---------------------------------------------------------------------------
+  // 要素を消す/クリックするのではなく <style> を挿すだけ。再ピン留めされた新しい
+  // バナーにも自動で効き、MutationObserver も不要。YouTube の「固定を解除」は押さ
+  // ないので、モデレーター/オーナーであっても他視聴者には一切影響しない。
+  // テキストメッセージを含むバナー(=固定メッセージ)だけを狙い、アンケート等の他
+  // バナーは対象外。中身が消えるとバナーマネージャは高さ0に畳まれる。
+  const HIDE_STYLE_ID = 'ylh-hide-pinned';
+  const HIDE_CSS =
+    'yt-live-chat-banner-renderer:has(yt-live-chat-text-message-renderer){display:none!important;}';
+
+  function applyHidePinned(on) {
+    const existing = document.getElementById(HIDE_STYLE_ID);
+    if (on) {
+      if (existing) return;
+      const s = document.createElement('style');
+      s.id = HIDE_STYLE_ID;
+      s.textContent = HIDE_CSS;
+      (document.head || document.documentElement).appendChild(s);
+    } else if (existing) {
+      existing.remove();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // (1) 「すべて表示」への切り替え
+  // ---------------------------------------------------------------------------
   let done = false;
   let opened = false;
 
-  chrome.storage.local.get('allChat', (stored) => {
-    if (typeof stored.allChat === 'boolean') allChat = stored.allChat;
-    if (allChat) start();
-  });
-
-  function start() {
+  function startAllChat() {
     const startedAt = Date.now();
     (function tick() {
       if (done) return;
@@ -75,4 +99,21 @@
     }
     done = true;
   }
+
+  // ---------------------------------------------------------------------------
+  // 初期化 & 設定の反映
+  // ---------------------------------------------------------------------------
+  chrome.storage.local.get(['allChat', 'hidePinned'], (stored) => {
+    const allChat = typeof stored.allChat === 'boolean' ? stored.allChat : true;
+    const hidePinned =
+      typeof stored.hidePinned === 'boolean' ? stored.hidePinned : true;
+    if (hidePinned) applyHidePinned(true);
+    if (allChat) startAllChat();
+  });
+
+  // 固定メッセージ非表示トグルはページ再読み込みなしで即時反映（CSS の付け外し）
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    if (changes.hidePinned) applyHidePinned(changes.hidePinned.newValue !== false);
+  });
 })();
