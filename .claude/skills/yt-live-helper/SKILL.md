@@ -33,18 +33,19 @@ removed at the user's request).
 
 ## Release / changelog workflow (follow this)
 
-The repo keeps a `CHANGELOG.md` (Keep a Changelog format, SemVer, Japanese,
-newest on top) — the user relies on it in place of GitHub Releases. **Whenever
-you make a user-facing change here, add a bullet to the `[Unreleased]` section
-of `CHANGELOG.md` in the same commit as the change** (Added / Changed / Fixed /
-Removed). This is a standing request from the user, not optional.
+The process (Keep a Changelog + SemVer, `CHANGELOG.md` with a `[Unreleased]`
+section, `manifest.json` version bump, annotated tag) is the workspace-wide
+convention — see **rule 4** of `~/projects/.claude/skills/projects-workspace/SKILL.md`
+(skill: `projects-workspace`). Don't restate the steps here.
 
-- Internal-only changes (skill notes, tests, refactors, README/doc tweaks with
-  no user-visible effect) do **not** get a changelog entry.
-- On release: bump `manifest.json` `version`, rename `[Unreleased]` →
-  `[X.Y.Z] - YYYY-MM-DD`, add a fresh empty `[Unreleased]` above it, and tag
-  `git tag -a X.Y.Z` (no `v` prefix — matches existing `1.0.0`/`1.1.0`/`2.5.0`
-  and the SemVer string). Push over SSH; `gh` is intentionally not used here.
+Project-specific:
+
+- The user relies on this `CHANGELOG.md` **in place of GitHub Releases**, so
+  keeping `[Unreleased]` current in the *same commit* as each user-facing change
+  is a standing, non-optional request (this repo is more release-note-driven
+  than most in the workspace).
+- Tags take **no `v` prefix** — matches the existing `1.0.0`/`1.1.0`/`2.5.0`.
+- **Push over SSH; `gh` is intentionally not used here.**
 
 ## History — this used to be a much bigger extension
 
