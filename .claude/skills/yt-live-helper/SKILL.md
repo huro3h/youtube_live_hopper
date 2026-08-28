@@ -90,18 +90,61 @@ Two content scripts, no `background.js`, no `host_permissions`. Only the
 
 - Reads `jumpToLive` from `chrome.storage.local` on load and via
   `chrome.storage.onChanged`, so toggling the popup switch applies without a
-  page reload if the SPA navigates again.
+  page reload if the SPA navigates again. **The initial run happens inside the
+  `storage.get` callback, not synchronously at script end** — see the 2.6.1 bug
+  below; a synchronous first run reads the `true` default and ignores an OFF
+  setting on every fresh page load.
 - Listens for YouTube's `yt-navigate-finish` document event (the same signal
   used elsewhere in this workspace, e.g. `yt-auto-quality-lite`, to detect
   SPA navigation) plus runs once on initial script load, dedup'd by video ID
   (`?v=` on `/watch`, or the path segment on `/live/<id>`) so it only acts
   once per video, not on every SPA event for the same video.
-- Seeks via two mechanisms together (belt-and-suspenders): clicking
-  `.ytp-live-badge` (the visible "LIVE" button) and calling the player's
-  undocumented `seekToLiveHead()` method. `.ytp-live-badge` only exists in
-  the DOM when the video is actually a live broadcast, so this naturally
-  no-ops on regular VODs — polls for up to 15s (300ms interval) in case the
-  player hasn't mounted yet, then gives up silently.
+- Live detection is `document.querySelector('.ytp-time-display.ytp-live')` —
+  the `ytp-live` class is added to the time display **only** while the player
+  is showing a live broadcast. Polls for it up to 15s (300ms interval) in case
+  the player hasn't mounted yet, then gives up silently.
+- **Do NOT use the presence of `.ytp-live-badge` as the live test** — this was
+  the 2.6.1 bug (see below). Once live-ness is established, the seek uses two
+  mechanisms together (belt-and-suspenders): clicking `.ytp-live-badge` (the
+  "LIVE" button) and calling the player's undocumented `seekToLiveHead()`.
+
+#### The 2.6.1 bug — `.ytp-live-badge` exists on *every* video
+
+Earlier versions assumed `.ytp-live-badge` is only in the DOM for live
+broadcasts and therefore clicked it unconditionally. **That assumption is
+false**, verified by DOM inspection in Brave:
+
+| | `.ytp-live-badge` | computed `display` | `.ytp-time-display` classes |
+|---|---|---|---|
+| live | present | `inline-block` | `ytp-time-display notranslate ytp-live` |
+| VOD  | **present** | **`none`** | `ytp-time-display notranslate` |
+
+So the extension clicked a hidden live badge on **every** `/watch` page, and
+that click corrupts the playback position of normal videos (measured A/B:
+without the extension the video plays normally; with it, playback is thrown to
+a wrong position — the user saw the seek bar run to the end and the video
+finish; in the Brave harness it landed at 0 and paused). Shorts opened at a
+`/watch?v=` URL were hit identically; `/shorts/<id>` URLs are untouched because
+the content script isn't injected there.
+
+Other measured facts worth keeping:
+  - `player.seekToLiveHead()` (MAIN world) is a genuine **no-op on a VOD** —
+    playback continues undisturbed. The damage came purely from the badge click.
+  - The badge appears in the DOM at ~800ms, *before* `readyState` reaches
+    `interactive`/`complete`, i.e. before the content script runs at
+    `document_idle`. So the poll always matched on its very first tick — the
+    bug fired on every page load, not intermittently.
+  - On a live page the badge carries `disabled=true` + class
+    `ytp-live-badge-is-livehead` while you are at the live head, and
+    `element.click()` on a disabled button dispatches no event — so the click is
+    harmlessly ignored in that case. **Don't add a `!badge.disabled` guard**: at
+    the moment the content script runs the flag is still `true` even on a page
+    that is actually behind the live head (measured), so guarding on it would
+    skip the seek exactly when it's wanted.
+  - Regression check for any future change here: with the extension loaded on a
+    normal video, a page-level capture listener must observe **zero** synthetic
+    (`isTrusted: false`) clicks on `.ytp-live-badge`, and playback must advance
+    normally. See "E2E" below.
 - **Note:** from the ISOLATED world, `player.seekToLiveHead()` is actually
   *not callable* (see world gotcha below) — the seek works because of the
   `.ytp-live-badge` click, which is a plain DOM click. The
@@ -253,7 +296,7 @@ bridges with `CustomEvent`s.)
   loaded (style injected, pinned banner `display:none`, manager height 0, and
   `allChat` switched to "チャット" in the same run). An older Puppeteer +
   Chrome-for-Testing recipe from the `yt-auto-quality-lite` skill also works.
-- `seekToLiveHead()`/`.ytp-live-badge` (player), `#view-selector` +
+- `seekToLiveHead()`/`.ytp-live-badge`/`.ytp-time-display.ytp-live` (player), `#view-selector` +
   `tp-yt-paper-listbox` (chat mode dropdown),
   `yt-live-chat-banner-renderer` / `yt-live-chat-banner-manager` (pinned banner),
   and `yt-live-chat-poll-renderer` / `#action-panel` (poll) are all

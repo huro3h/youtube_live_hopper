@@ -46,8 +46,9 @@ Chromeツールバーの YouTube Live Helper アイコンをクリックする�
 ### ライブヘッドへの自動シーク（`content.js`）
 
 1. `content.js` がYouTubeの動画ページに注入される
-2. 動画ページ（`/watch` または `/live/`）へのアクセス・SPA遷移（`yt-navigate-finish`）を検知
-3. プレーヤーに `.ytp-live-badge`（ライブバッジ）が表示されるまで待機（配信中でない動画では何もしない）
+2. 設定（ON/OFF）を読み込んだうえで、動画ページ（`/watch` または `/live/`）へのアクセス・SPA遷移（`yt-navigate-finish`）を検知
+3. プレーヤーがライブ表示になる（`.ytp-time-display` に `.ytp-live` が付く）まで待機（配信中でない動画では何もしない）
+   - `.ytp-live-badge` 要素自体は通常動画のプレーヤーにも存在する（CSSで非表示になっているだけ）ため、要素の有無ではライブ判定に使えません
 4. ライブバッジのクリックとプレーヤーAPI（`seekToLiveHead()`）の両方で最新位置へシーク
 
 ### チャットの自動全表示・固定メッセージの非表示（`chat.js`）
