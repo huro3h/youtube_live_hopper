@@ -29,7 +29,10 @@ Four features today, each with its own popup toggle (all stored in
   mode (see chat.js notes).
 
 Popup labels are plain text (no leading emoji — an earlier ⚡/💬 pass was
-removed at the user's request).
+removed at the user's request). The popup header shows the extension name with
+the current version at its right edge; the version is read at runtime from
+`chrome.runtime.getManifest().version`, so a release only needs the
+`manifest.json` bump — never hardcode it in `popup.html`.
 
 ## Release / changelog workflow (follow this)
 

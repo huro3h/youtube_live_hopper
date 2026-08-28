@@ -4,6 +4,10 @@ const allChatToggle = document.getElementById('allChatToggle');
 const hidePinnedToggle = document.getElementById('hidePinnedToggle');
 const hidePollsToggle = document.getElementById('hidePollsToggle');
 const toast = document.getElementById('toast');
+const appVersion = document.getElementById('appVersion');
+
+// ヘッダー右端に manifest のバージョンを表示する（手動更新が不要になるよう実行時に取得）
+appVersion.textContent = `v${chrome.runtime.getManifest().version}`;
 
 let jumpToLive = true;
 let allChat = true;
