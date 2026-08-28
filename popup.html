@@ -49,6 +49,14 @@
     .section {
       padding: 16px 18px;
     }
+    .section + .section { border-top: 1px solid var(--border); }
+    .section-title {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
     .toggle-row {
       display: flex;
       align-items: center;
@@ -78,6 +86,29 @@
     }
     .toggle.on::after { transform: translateX(16px); }
 
+    /* 「画質を自動設定」に従属する行。親トグルがOFFのときはまとめて無効化する */
+    .sub-rows { margin-top: 14px; }
+    .sub-rows.disabled { opacity: 0.35; pointer-events: none; }
+    .sub-rows .toggle-row + .toggle-row { margin-top: 14px; }
+    .select-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .select-row select {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 6px;
+      font-family: inherit;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .select-row select:disabled { opacity: 0.4; cursor: not-allowed; }
+
     .toast {
       position: fixed;
       top: 7px; left: 50%;
@@ -105,6 +136,7 @@
 <div class="app-header">YouTube Live Helper<span class="app-version" id="appVersion"></span></div>
 
 <div class="section">
+  <div class="section-title">ライブ配信</div>
   <div class="toggle-row">
     <span class="toggle-label">常に最新位置から再生</span>
     <div class="toggle on" id="jumpToLiveToggle"></div>
@@ -120,6 +152,34 @@
   <div class="toggle-row">
     <span class="toggle-label">アンケートを自動で非表示</span>
     <div class="toggle on" id="hidePollsToggle"></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">画質（通常動画・Shorts含む）</div>
+  <div class="toggle-row">
+    <span class="toggle-label">画質を自動設定</span>
+    <div class="toggle on" id="autoQualityToggle"></div>
+  </div>
+  <div class="sub-rows" id="qualityFields">
+    <div class="toggle-row">
+      <span class="toggle-label">常に最高画質を使う</span>
+      <div class="toggle" id="useMaxQualityToggle"></div>
+    </div>
+    <div class="select-row">
+      <span class="toggle-label">デフォルト画質</span>
+      <select id="defaultQuality">
+        <option value="highres">4320p (8K)</option>
+        <option value="hd2160">2160p (4K)</option>
+        <option value="hd1440">1440p (2K)</option>
+        <option value="hd1080">1080p</option>
+        <option value="hd720">720p</option>
+        <option value="large">480p</option>
+        <option value="medium">360p</option>
+        <option value="small">240p</option>
+        <option value="tiny">144p</option>
+      </select>
+    </div>
   </div>
 </div>
 

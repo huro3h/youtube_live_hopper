@@ -1,19 +1,23 @@
 ---
 name: yt-live-helper
-description: Architecture and history for the yt-live-helper Chrome extension (formerly youtube_live_hopper / YouTubeLiveHopper; a small grab-bag of YouTube Live viewing conveniences — auto-seeks live pages to the live head, switches live chat from "Top chat" to "all chat", and locally hides the creator's pinned-message banner and in-chat polls). Use when extending or debugging this extension, understanding why it was pared down from a multi-feature channel-hopper before growing back into a small convenience collection, or dealing with the MAIN/ISOLATED content-script world split.
+description: Architecture and history for the yt-live-helper Chrome extension (formerly youtube_live_hopper / YouTubeLiveHopper; a small grab-bag of YouTube viewing conveniences — auto-seeks live pages to the live head, switches live chat from "Top chat" to "all chat", locally hides the creator's pinned-message banner and in-chat polls, and forces playback quality across all of youtube.com). Use when extending or debugging this extension, understanding why it was pared down from a multi-feature channel-hopper before growing back into a small convenience collection, why the standalone yt-auto-quality-lite extension was absorbed into it, or dealing with the MAIN/ISOLATED content-script world split.
 ---
 
 # yt-live-helper — development notes
 
 A minimal, dependency-free Manifest V3 Chrome extension: a small grab-bag of
-"make watching YouTube Live nicer" conveniences. Framing note: the manifest
-`description` was deliberately generalized to
-「YouTube Liveの視聴を快適にする便利機能を詰め合わせたChrome拡張機能」so that
-adding a feature no longer requires editing it — do **not** narrow it back to
-a single-feature sentence.
+"make watching YouTube nicer" conveniences. Framing note: the manifest
+`description` is deliberately generic —
+「YouTubeの視聴を快適にする便利機能を詰め合わせたChrome拡張機能」— so that adding
+a feature no longer requires editing it. Do **not** narrow it back to a
+single-feature sentence, and note it was widened from 「YouTube Liveの視聴を…」
+when the quality feature (which also runs on VODs and Shorts) was absorbed;
+don't re-scope it to Live only. The extension **name** stays
+`YouTube Live Helper` — Live remains the center of gravity.
 
-Four features today, each with its own popup toggle (all stored in
-`chrome.storage.local`, default `true`):
+Five features today, each with its own popup toggle (all stored in
+`chrome.storage.local`; every toggle defaults `true` except `useMaxQuality`,
+which defaults `false`):
 
 - **Live-head auto-seek** (`常に最新位置から再生`, key `jumpToLive`) — on opening
   a live watch page, seek the player to the live head. `content.js`.
@@ -27,6 +31,29 @@ Four features today, each with its own popup toggle (all stored in
   creator's in-chat poll from *your own* view via injected CSS. `chat.js`.
   Purely local. Also cleans up the broken poll stub YouTube leaves in all-chat
   mode (see chat.js notes).
+- **Quality auto-set** (`画質を自動設定`, key `autoQuality`) — force playback
+  quality to a configured default (key `defaultQuality`, `"hd1080"`) or to the
+  best available (key `useMaxQuality`, default `false`, takes priority).
+  `quality-bridge.js` + `quality-inject.js`. **Unlike the other four this runs
+  on all of `https://www.youtube.com/*`** (VODs and Shorts included), not just
+  live pages — absorbed from the standalone `yt-auto-quality-lite` extension
+  (see below).
+
+The popup is split into two `.section` blocks with small headings —
+「ライブ配信」(the four live features) and「画質（通常動画・Shorts含む）」— the
+heading on the quality block is what tells the user it isn't Live-only. The
+quality block's two sub-rows (`常に最高画質を使う`, `デフォルト画質`) live in
+`#qualityFields`, dimmed + `pointer-events:none` via `.sub-rows.disabled` when
+`autoQuality` is OFF; the `<select>` is additionally `disabled` when
+`useMaxQuality` is ON, since the default quality is unused then.
+
+**Pitfall caught in E2E during the merge:** a `<select>` with no `selected`
+attribute shows its **first** option (`4320p (8K)`) until JS assigns a value, so
+`popup.js` must set `defaultQualitySelect.value` **unconditionally** —
+`stored.defaultQuality ?? DEFAULT_QUALITY` — not only when a stored string
+exists. Playback was still correct (the bridge supplies the default via
+`storage.get(DEFAULTS)`); it was the popup that lied about the current setting.
+Keep this in mind for any future `<select>` added here.
 
 Popup labels are plain text (no leading emoji — an earlier ⚡/💬 pass was
 removed at the user's request). The popup header shows the extension name with
@@ -80,10 +107,38 @@ removed channel-hopper). Note the Claude Code project-memory dir is still keyed
 to the old path (`-Users-huro3h-projects-youtube-live-hopper`) — that key is
 frozen at creation and doesn't follow the directory rename.
 
+## Merge — `yt-auto-quality-lite` was absorbed into this extension (2026-08-29)
+
+The quality feature was its own standalone unpacked extension,
+`~/projects/yt-auto-quality-lite`, until the user asked to run **one** extension
+instead of two. What the merge changed vs. the original:
+
+- Scripts moved `src/scripts/{bridge,inject}.js` → `quality-bridge.js` /
+  `quality-inject.js` at the repo root (this repo is flat; there is no `src/`).
+- Storage moved `chrome.storage.sync` → **`chrome.storage.local`**, to match the
+  four existing features. Nothing is migrated — the old extension's `sync` data
+  belongs to a different extension ID and is unreadable from here anyway, so
+  quality settings simply start at their defaults after the merge.
+- CustomEvent names re-prefixed `ythq:` → **`ylh:quality-settings` /
+  `ylh:quality-request`**.
+- Added the `autoQuality` master toggle, which the standalone version had no
+  equivalent of (it always applied). OFF also stops the fallback interval.
+- `minimum_chrome_version: "111"` came along with it — required for
+  `world: "MAIN"` in `content_scripts`. Don't drop it.
+- `host_permissions` was **not** carried over: content-script `matches` are
+  enough for what this does, and adding it would only widen the install warning.
+
+The old repo is kept on disk with a "merged / deprecated" note at the top of its
+`README.md` (the user's choice — not deleted, not archived on GitHub). Its skill
+`yt-auto-quality-lite` is still the deeper reference for *why* the undocumented
+player API is the only option and for the Puppeteer/Chrome-for-Testing recipe;
+read it before touching quality code here, but treat this file as authoritative
+for how the feature is wired **now**.
+
 ## How it works now
 
-Two content scripts, no `background.js`, no `host_permissions`. Only the
-`storage` permission.
+Four content-script entries (two live/chat, two quality), no `background.js`,
+no `host_permissions`. Only the `storage` permission.
 
 ### Live-head auto-seek — `content.js`
 
@@ -98,8 +153,7 @@ Two content scripts, no `background.js`, no `host_permissions`. Only the
   below; a synchronous first run reads the `true` default and ignores an OFF
   setting on every fresh page load.
 - Listens for YouTube's `yt-navigate-finish` document event (the same signal
-  used elsewhere in this workspace, e.g. `yt-auto-quality-lite`, to detect
-  SPA navigation) plus runs once on initial script load, dedup'd by video ID
+  `quality-inject.js` uses to detect SPA navigation) plus runs once on initial script load, dedup'd by video ID
   (`?v=` on `/watch`, or the path segment on `/live/<id>`) so it only acts
   once per video, not on every SPA event for the same video.
 - Live detection is `document.querySelector('.ytp-time-display.ytp-live')` —
@@ -231,6 +285,41 @@ moves depending on the chat view mode**:
   (which would not re-run) — verify if switching videos ever stops
   auto-switching.
 
+### Quality auto-set — `quality-bridge.js` (ISOLATED) + `quality-inject.js` (MAIN)
+
+The only pair in this repo that needs the MAIN/ISOLATED bridge (see the world
+gotcha below): `chrome.storage` is reachable only from ISOLATED, the player's
+`getAvailableQualityLevels()` / `setPlaybackQualityRange()` only from MAIN. They
+share `document`, so they talk over plain `CustomEvent`s — no messaging library.
+
+- Both entries match `https://www.youtube.com/*` at `document_start`, top frame
+  only (no `all_frames`), so they also load in the `live_chat` frame's own tab
+  if it is ever opened directly — harmless, there is no `.html5-video-player`
+  there.
+- `quality-bridge.js`: reads `{autoQuality, defaultQuality, useMaxQuality}` from
+  `chrome.storage.local` and dispatches `ylh:quality-settings` on load, on
+  `storage.onChanged` (filtered to those three keys), and on `ylh:quality-request`
+  — the last one covers the race where `quality-inject.js` starts before the
+  bridge's first broadcast.
+- `quality-inject.js`: **`settings` starts as `null` and every apply pass bails
+  until the first `ylh:quality-settings` arrives.** This is the same lesson as
+  the 2.6.1 `jumpToLive` bug — running with a baked-in default would force
+  quality once per page load even with the feature OFF. Don't re-add a `DEFAULTS`
+  object here; defaults live in `quality-bridge.js` and `popup.js` only.
+- Apply pass walks `document.querySelectorAll('.html5-video-player')` (covers
+  watch pages *and* Shorts) and calls `setPlaybackQualityRange(target, target)` —
+  the same value twice pins one quality instead of a range. Everything is in
+  `try/catch` and fails silently; these are unofficial APIs.
+- Target selection: `useMaxQuality` → `available[0]`; else `defaultQuality` if
+  present in `available`, else `available[0]` (a video whose max is below the
+  configured default). Quality strings, best→worst: `highres` (8K), `hd2160`,
+  `hd1440`, `hd1080`, `hd720`, `large` (480p), `medium` (360p), `small` (240p),
+  `tiny` (144p), then `auto`.
+- Re-runs on `yt-navigate-finish` plus a 1500ms `setInterval` fallback (quality
+  list not ready, ad transitions, missed events). The interval is started when
+  `autoQuality` is ON and `clearInterval`'d when it's toggled OFF, so an OFF
+  setting costs nothing.
+
 ## Backlog / future work
 
 - _(none open right now)_ — the poll-hide request was implemented as the
@@ -274,15 +363,16 @@ default content script runs in the **ISOLATED** world: it shares the DOM, so
 work, but the element's YouTube-added methods are **invisible**
 (`typeof player.getPlayerResponse === 'function'` is `false`). Any future
 feature that needs to *call* a player method (not just click DOM) must run in
-a `world: "MAIN"` content script.
+a `world: "MAIN"` content script — `quality-inject.js` is the in-repo example
+of doing it right (MAIN script + ISOLATED bridge over `CustomEvent`s).
 
 Debugging trap that cost time here: Puppeteer's `page.evaluate()` runs in the
 MAIN world by default, so a standalone `evaluate` reading `getCurrentTime()`
 *succeeds* and makes the approach look viable — while the same call from the
 ISOLATED content script silently returns nothing. Always confirm which world
 a call needs before assuming an `evaluate` result reflects what a content
-script will see. (Same MAIN/ISOLATED concern as `yt-auto-quality-lite`, which
-bridges with `CustomEvent`s.)
+script will see. (Same MAIN/ISOLATED concern the quality feature solves with
+its `CustomEvent` bridge.)
 
 ## Scope / known limitations
 
@@ -290,9 +380,23 @@ bridges with `CustomEvent`s.)
   backwards, then navigate to another live video via a YouTube link — it
   should land at the live edge automatically, the chat should switch from
   "トップチャット" to "チャット" on its own, and any creator-pinned message
-  banner or in-chat poll should stay hidden.
+  banner or in-chat poll should stay hidden. For quality, use a video actually
+  encoded above 1080p (otherwise "default 1080p" and "max quality" are
+  indistinguishable) — known-good 4K test video: Big Buck Bunny 4K60,
+  `https://www.youtube.com/watch?v=aqz-KE-bpKQ` — and read back
+  `document.querySelector('.html5-video-player').getPlaybackQuality()`. Check a
+  Shorts URL too, since that path is unique to this feature.
 - **E2E.** Use the shared **`browser-testing`** skill (Playwright + Brave
-  Browser Nightly; its Recipe B loads the unpacked extension). Project-specific
+  Browser Nightly; its Recipe B loads the unpacked extension). The quality
+  feature was verified this way at merge time (2026-08-29), all green: extension
+  loads with no errors; on Big Buck Bunny 4K the default run pins `hd1080`;
+  toggling `常に最高画質` in the real popup switches the already-open tab to
+  `hd2160` **without a reload** (proves storage.onChanged → CustomEvent →
+  MAIN-world path); with `autoQuality` OFF a fresh load is left alone (landed on
+  YouTube's own `hd1440`); a `/shorts/` page reaches the player API; and the
+  2.6.1 regression guard still holds (zero synthetic `.ytp-live-badge` clicks on
+  a VOD). The live-only features (seek, chat) were *not* re-tested — they need a
+  real live stream and none of their code changed. Project-specific
   bits: the live chat is a same-origin subframe, so grab it with
   `page.frames().find(f => f.url().includes('live_chat'))` and `evaluate` inside
   *that frame*. The chat features were verified this way with the extension
@@ -302,10 +406,13 @@ bridges with `CustomEvent`s.)
 - `seekToLiveHead()`/`.ytp-live-badge`/`.ytp-time-display.ytp-live` (player), `#view-selector` +
   `tp-yt-paper-listbox` (chat mode dropdown),
   `yt-live-chat-banner-renderer` / `yt-live-chat-banner-manager` (pinned banner),
-  and `yt-live-chat-poll-renderer` / `#action-panel` (poll) are all
-  unofficial/internal YouTube surfaces (same caveat as `yt-auto-quality-lite`'s
-  quality-forcing API) — fragile to YouTube UI changes, no official replacement
-  exists. The pinned/poll-hide CSS relies on `:has()` (fine in current
+  `yt-live-chat-poll-renderer` / `#action-panel` (poll), and
+  `getAvailableQualityLevels()` / `setPlaybackQualityRange()` (quality) are all
+  unofficial/internal YouTube surfaces — fragile to YouTube UI changes, no
+  official replacement exists. For quality specifically there is provably no
+  official alternative (the Data API has no player control; the IFrame API can't
+  attach to youtube.com's own player) — see the `yt-auto-quality-lite` skill for
+  that research before anyone re-proposes an "official" fix. The pinned/poll-hide CSS relies on `:has()` (fine in current
   Chromium/Brave; `CSS.supports('selector(:has(*))')` was true).
 - Old `chrome.storage.local` keys from v1 (`apiKey`, `topicChannels`,
   `channels`, `currentIndex`, `autoHop`, `lastQuery`) are simply orphaned on

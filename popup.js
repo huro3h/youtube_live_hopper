@@ -3,6 +3,10 @@ const jumpToLiveToggle = document.getElementById('jumpToLiveToggle');
 const allChatToggle = document.getElementById('allChatToggle');
 const hidePinnedToggle = document.getElementById('hidePinnedToggle');
 const hidePollsToggle = document.getElementById('hidePollsToggle');
+const autoQualityToggle = document.getElementById('autoQualityToggle');
+const useMaxQualityToggle = document.getElementById('useMaxQualityToggle');
+const defaultQualitySelect = document.getElementById('defaultQuality');
+const qualityFields = document.getElementById('qualityFields');
 const toast = document.getElementById('toast');
 const appVersion = document.getElementById('appVersion');
 
@@ -13,9 +17,21 @@ let jumpToLive = true;
 let allChat = true;
 let hidePinned = true;
 let hidePolls = true;
+let autoQuality = true;
+let useMaxQuality = false;
+// select は先頭optionが初期選択になるため、未保存時は明示的に既定値へ戻す必要がある
+const DEFAULT_QUALITY = 'hd1080';
 
 async function init() {
-  const stored = await chrome.storage.local.get(['jumpToLive', 'allChat', 'hidePinned', 'hidePolls']);
+  const stored = await chrome.storage.local.get([
+    'jumpToLive',
+    'allChat',
+    'hidePinned',
+    'hidePolls',
+    'autoQuality',
+    'useMaxQuality',
+    'defaultQuality',
+  ]);
   if (typeof stored.jumpToLive === 'boolean') {
     jumpToLive = stored.jumpToLive;
   }
@@ -28,10 +44,27 @@ async function init() {
   if (typeof stored.hidePolls === 'boolean') {
     hidePolls = stored.hidePolls;
   }
+  if (typeof stored.autoQuality === 'boolean') {
+    autoQuality = stored.autoQuality;
+  }
+  if (typeof stored.useMaxQuality === 'boolean') {
+    useMaxQuality = stored.useMaxQuality;
+  }
+  defaultQualitySelect.value =
+    typeof stored.defaultQuality === 'string' ? stored.defaultQuality : DEFAULT_QUALITY;
   jumpToLiveToggle.classList.toggle('on', jumpToLive);
   allChatToggle.classList.toggle('on', allChat);
   hidePinnedToggle.classList.toggle('on', hidePinned);
   hidePollsToggle.classList.toggle('on', hidePolls);
+  autoQualityToggle.classList.toggle('on', autoQuality);
+  useMaxQualityToggle.classList.toggle('on', useMaxQuality);
+  syncQualityFields();
+}
+
+// 「常に最高画質」がONのときデフォルト画質は使われない。親トグルがOFFなら画質設定ごと無効化する
+function syncQualityFields() {
+  qualityFields.classList.toggle('disabled', !autoQuality);
+  defaultQualitySelect.disabled = !autoQuality || useMaxQuality;
 }
 
 jumpToLiveToggle.addEventListener('click', () => {
@@ -60,6 +93,27 @@ hidePollsToggle.addEventListener('click', () => {
   hidePollsToggle.classList.toggle('on', hidePolls);
   chrome.storage.local.set({ hidePolls });
   showToast(hidePolls ? 'アンケートを自動で非表示: ON' : 'アンケートを自動で非表示: OFF');
+});
+
+autoQualityToggle.addEventListener('click', () => {
+  autoQuality = !autoQuality;
+  autoQualityToggle.classList.toggle('on', autoQuality);
+  syncQualityFields();
+  chrome.storage.local.set({ autoQuality });
+  showToast(autoQuality ? '画質を自動設定: ON' : '画質を自動設定: OFF');
+});
+
+useMaxQualityToggle.addEventListener('click', () => {
+  useMaxQuality = !useMaxQuality;
+  useMaxQualityToggle.classList.toggle('on', useMaxQuality);
+  syncQualityFields();
+  chrome.storage.local.set({ useMaxQuality });
+  showToast(useMaxQuality ? '常に最高画質を使う: ON' : '常に最高画質を使う: OFF');
+});
+
+defaultQualitySelect.addEventListener('change', () => {
+  chrome.storage.local.set({ defaultQuality: defaultQualitySelect.value });
+  showToast(`デフォルト画質: ${defaultQualitySelect.selectedOptions[0].textContent}`);
 });
 
 let toastTimer;
