@@ -129,7 +129,9 @@ instead of two. What the merge changed vs. the original:
   enough for what this does, and adding it would only widen the install warning.
 
 The old repo is kept on disk with a "merged / deprecated" note at the top of its
-`README.md` (the user's choice — not deleted, not archived on GitHub). Its skill
+`README.md`, and **archived (read-only) on GitHub** as of 2026-08-29 — so it can
+still be read and cloned, but nothing can be pushed to it without unarchiving
+first. Its skill
 `yt-auto-quality-lite` is still the deeper reference for *why* the undocumented
 player API is the only option and for the Puppeteer/Chrome-for-Testing recipe;
 read it before touching quality code here, but treat this file as authoritative
